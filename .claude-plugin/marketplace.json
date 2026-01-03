@@ -1,7 +1,7 @@
 {
   "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
-  "name": "claude-plugins-official-enhanced",
-  "description": "Directory of popular Claude Code extensions including development tools, productivity plugins, and MCP integrations. Enhanced with additional features and integrations.",
+  "name": "teknologist-plugins",
+  "description": "Community marketplace with Claude Code extensions including development tools, productivity plugins, and MCP integrations. Fork of the official plugins with additional features.",
   "owner": {
     "name": "The Teknologist",
     "email": "teknologist@gmail.com"
