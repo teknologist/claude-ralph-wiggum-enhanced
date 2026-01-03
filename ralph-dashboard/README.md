@@ -81,6 +81,12 @@ bun run test
 # Run tests with coverage
 bun run test:coverage
 
+# Run e2e tests
+bun run test:e2e
+
+# Run e2e tests in UI mode
+bun run test:e2e:ui
+
 # Type check
 bun run typecheck
 
@@ -96,11 +102,13 @@ ralph-dashboard/
 │   ├── components/         # React components
 │   ├── hooks/              # React Query hooks
 │   ├── lib/                # API client
-│   └── __tests__/          # Frontend tests
+│   └── __tests__/          # Frontend unit tests
 ├── server/                 # Backend Bun server
 │   ├── api/                # API route handlers
 │   ├── services/           # Business logic
-│   └── __tests__/          # Backend tests
+│   └── __tests__/          # Backend unit tests
+├── tests/
+│   └── e2e/                # Playwright e2e tests
 └── dist/                   # Production build
 ```
 

@@ -83,4 +83,28 @@ describe('StatsBar', () => {
     expect(screen.getByText('0%')).toBeInTheDocument();
     expect(screen.getByText('0/0')).toBeInTheDocument();
   });
+
+  it('should format average duration in hours for long sessions', () => {
+    const longSessions: Session[] = [
+      {
+        session_id: 'long-1',
+        status: 'success',
+        outcome: 'success',
+        project: '/test/project',
+        project_name: 'project',
+        state_file_path: '/test/.claude/state.md',
+        task: 'Long task',
+        started_at: '2024-01-15T09:00:00Z',
+        ended_at: '2024-01-15T12:30:00Z',
+        duration_seconds: 7200, // 2 hours
+        iterations: 5,
+        max_iterations: 10,
+        completion_promise: null,
+        error_reason: null,
+      },
+    ];
+    render(<StatsBar sessions={longSessions} activeCount={0} />);
+    // Average duration should be shown in hours format
+    expect(screen.getByText('2h 0m')).toBeInTheDocument();
+  });
 });

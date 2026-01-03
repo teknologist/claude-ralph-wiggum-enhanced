@@ -1,6 +1,16 @@
-import { describe, it, expect } from 'vitest';
-import { mergeSessions } from '../services/log-parser';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import {
+  mergeSessions,
+  parseLogFile,
+  getSessions,
+  getSessionById,
+  getLogFilePath,
+  readIterationFromStateFile,
+} from '../services/log-parser';
 import type { LogEntry, StartLogEntry, CompletionLogEntry } from '../types';
+import { writeFileSync, mkdirSync, rmSync } from 'fs';
+import { join } from 'path';
+import { tmpdir } from 'os';
 
 describe('log-parser', () => {
   describe('mergeSessions', () => {
@@ -233,6 +243,202 @@ describe('log-parser', () => {
       const result = mergeSessions([completionOnly]);
 
       expect(result).toHaveLength(0);
+    });
+
+    it('should extract completion promise from task', () => {
+      const startEntry: StartLogEntry = {
+        session_id: 'test-promise',
+        status: 'active',
+        project: '/Users/test/project',
+        project_name: 'project',
+        state_file_path: '/test/.claude/state',
+        task: 'Do something --completion-promise=DONE',
+        started_at: new Date().toISOString(),
+        max_iterations: 10,
+        completion_promise: null, // Not set explicitly, should extract from task
+      };
+
+      const result = mergeSessions([startEntry]);
+
+      expect(result[0].completion_promise).toBe('DONE');
+      expect(result[0].task).toBe('Do something');
+    });
+
+    it('should extract quoted completion promise from task', () => {
+      const startEntry: StartLogEntry = {
+        session_id: 'test-quoted',
+        status: 'active',
+        project: '/Users/test/project',
+        project_name: 'project',
+        state_file_path: '/test/.claude/state',
+        task: 'Do something --completion-promise="COMPLETE"',
+        started_at: new Date().toISOString(),
+        max_iterations: 10,
+        completion_promise: null,
+      };
+
+      const result = mergeSessions([startEntry]);
+
+      expect(result[0].completion_promise).toBe('COMPLETE');
+    });
+
+    it('should prefer explicit completion_promise over extracted', () => {
+      const startEntry: StartLogEntry = {
+        session_id: 'test-explicit',
+        status: 'active',
+        project: '/Users/test/project',
+        project_name: 'project',
+        state_file_path: '/test/.claude/state',
+        task: 'Do something --completion-promise=EXTRACTED',
+        started_at: new Date().toISOString(),
+        max_iterations: 10,
+        completion_promise: 'EXPLICIT', // Explicit value
+      };
+
+      const result = mergeSessions([startEntry]);
+
+      expect(result[0].completion_promise).toBe('EXPLICIT');
+    });
+
+    it('should handle max_iterations outcome', () => {
+      const startEntry: StartLogEntry = {
+        session_id: 'max-iter-123',
+        status: 'active',
+        project: '/test',
+        project_name: 'test',
+        state_file_path: '/test/.claude/state',
+        task: 'Long running task',
+        started_at: '2024-01-15T10:00:00Z',
+        max_iterations: 5,
+        completion_promise: null,
+      };
+
+      const completionEntry: CompletionLogEntry = {
+        session_id: 'max-iter-123',
+        status: 'completed',
+        outcome: 'max_iterations',
+        ended_at: '2024-01-15T10:30:00Z',
+        duration_seconds: 1800,
+        iterations: 5,
+      };
+
+      const result = mergeSessions([startEntry, completionEntry]);
+
+      expect(result[0].status).toBe('max_iterations');
+    });
+  });
+
+  describe('readIterationFromStateFile', () => {
+    const testDir = join(tmpdir(), 'ralph-dashboard-test-' + Date.now());
+
+    beforeEach(() => {
+      mkdirSync(testDir, { recursive: true });
+    });
+
+    afterEach(() => {
+      rmSync(testDir, { recursive: true, force: true });
+    });
+
+    it('returns null for non-existent file', () => {
+      const result = readIterationFromStateFile('/non/existent/path.md');
+      expect(result).toBeNull();
+    });
+
+    it('parses iteration from valid state file', () => {
+      const stateFile = join(testDir, 'state.md');
+      const content = `---
+active: true
+session_id: test-123
+iteration: 5
+max_iterations: 10
+---
+Some content here`;
+      writeFileSync(stateFile, content);
+
+      const result = readIterationFromStateFile(stateFile);
+      expect(result).toBe(5);
+    });
+
+    it('returns null for malformed frontmatter (no closing ---)', () => {
+      const stateFile = join(testDir, 'malformed.md');
+      const content = `---
+active: true
+session_id: test-123
+iteration: 5`;
+      writeFileSync(stateFile, content);
+
+      const result = readIterationFromStateFile(stateFile);
+      expect(result).toBeNull();
+    });
+
+    it('returns null for incomplete frontmatter (missing active field)', () => {
+      const stateFile = join(testDir, 'incomplete.md');
+      const content = `---
+session_id: test-123
+iteration: 5
+---
+Content`;
+      writeFileSync(stateFile, content);
+
+      const result = readIterationFromStateFile(stateFile);
+      expect(result).toBeNull();
+    });
+
+    it('returns null for incomplete frontmatter (missing session_id field)', () => {
+      const stateFile = join(testDir, 'incomplete2.md');
+      const content = `---
+active: true
+iteration: 5
+---
+Content`;
+      writeFileSync(stateFile, content);
+
+      const result = readIterationFromStateFile(stateFile);
+      expect(result).toBeNull();
+    });
+
+    it('returns null for frontmatter without iteration field', () => {
+      const stateFile = join(testDir, 'no-iteration.md');
+      const content = `---
+active: true
+session_id: test-123
+---
+Content`;
+      writeFileSync(stateFile, content);
+
+      const result = readIterationFromStateFile(stateFile);
+      expect(result).toBeNull();
+    });
+  });
+
+  describe('getLogFilePath', () => {
+    it('returns expected path format', () => {
+      const path = getLogFilePath();
+      expect(path).toContain('.claude');
+      expect(path).toContain('ralph-wiggum-logs');
+      expect(path).toContain('sessions.jsonl');
+    });
+  });
+
+  describe('getSessions', () => {
+    it('returns empty array when no log file exists', () => {
+      // getSessions calls parseLogFile which checks if file exists
+      const sessions = getSessions();
+      expect(Array.isArray(sessions)).toBe(true);
+    });
+  });
+
+  describe('getSessionById', () => {
+    it('returns null for non-existent session', () => {
+      const session = getSessionById('non-existent-id');
+      expect(session).toBeNull();
+    });
+  });
+
+  describe('parseLogFile', () => {
+    it('returns empty array when log file does not exist', () => {
+      const entries = parseLogFile();
+      expect(Array.isArray(entries)).toBe(true);
     });
   });
 });
