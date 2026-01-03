@@ -8,7 +8,7 @@ Implementation of the Ralph Wiggum technique for iterative, self-referential AI 
 
 This fork adds the following features on top of the original Anthropic plugin:
 
-### v2.1.0 - Dashboard
+### v2.0.1 - Dashboard
 - **Ralph Dashboard**: Web-based dashboard for monitoring and managing Ralph loops
   - View all active and archived loops in real-time
   - Cancel active loops directly from the browser
