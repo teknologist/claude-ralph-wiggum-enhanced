@@ -1,6 +1,6 @@
 ---
 description: "Show Ralph Wiggum loop session history and statistics"
-argument-hint: "[--last N] [--project NAME] [--outcome TYPE] [--all]"
+argument-hint: "[--last N] [--project NAME] [--outcome TYPE] [--active] [--all]"
 allowed-tools: ["Bash"]
 hide-from-slash-command-tool: "true"
 ---
@@ -15,7 +15,8 @@ The user may provide arguments. Parse them:
 - `--last N` or `-n N`: Show last N sessions (default: 10)
 - `--project NAME` or `-p NAME`: Filter by project name (partial match)
 - `--outcome TYPE` or `-o TYPE`: Filter by outcome (success, max_iterations, cancelled, error)
-- `--all` or `-a`: Show all sessions (overrides --last)
+- `--active` or `-a`: Show only active (running) loops
+- `--all`: Show all sessions (overrides --last)
 
 ## Execute Query
 
@@ -49,12 +50,31 @@ Say: "No Ralph loop history found. Run some loops first!"
 ### If LOG_DATA found
 Parse the JSONL data between LOG_DATA_START and LOG_DATA_END. Each line is a JSON object.
 
+**Important: The log now uses a two-entry format:**
+- **Start entries** have `status: "active"` with fields: session_id, project, project_name, state_file_path, task, started_at, max_iterations, completion_promise
+- **Completion entries** have `status: "completed"` with fields: session_id, outcome, ended_at, duration_seconds, iterations, error_reason
+
+**Merging logic:**
+1. Group all entries by `session_id`
+2. For each session:
+   - Find the start entry (`status: "active"`) to get project, task, started_at, max_iterations, completion_promise
+   - Find the completion entry (`status: "completed"`) to get outcome, ended_at, duration_seconds, iterations
+   - If only start entry exists (no completion), the session is **currently active**
+   - Merge fields from both entries into a unified session object
+
+**Handling active sessions:**
+- Sessions with only a start entry (no completion entry) are currently running
+- Show them with status `🔄 active` instead of an outcome
+- Calculate duration from started_at to now
+- Show iterations as `?` (unknown until completion)
+
 Apply any filters the user requested:
+- If `--active` specified, show ONLY sessions that have no completion entry (still running)
 - If `--project` specified, filter entries where `project_name` contains the value (case-insensitive)
-- If `--outcome` specified, filter entries where `outcome` equals the value
+- If `--outcome` specified, filter completed entries where `outcome` equals the value
 - If `--all` NOT specified, limit to the last N entries (default 10)
 
-Sort by `ended_at` descending (most recent first).
+Sort by `started_at` descending (most recent first), with active sessions at the top.
 
 Display in this format:
 
@@ -62,36 +82,38 @@ Display in this format:
 📊 Ralph Loop Session History
 ═════════════════════════════════════════════════════════════════════════════════════════════════════════
 
-Project         Task                           Iters/Max  Duration  Promise      Outcome     Started              Ended
+Project         Task                           Iters/Max  Duration  Promise      Status      Started
 ──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
-my-api          Build REST API for todos...    15/50      1h 15m    COMPLETE     ✅ success  2024-01-15 10:30     2024-01-15 11:45
-my-api          Fix auth bug                   20/20      45m       FIXED        ⏹ max      2024-01-14 14:00     2024-01-14 14:45
-frontend        Refactor cache layer           8/∞        30m       -            🚫 cancel  2024-01-13 09:15     2024-01-13 09:45
-my-api          Add rate limiting              3/10       5m        DONE         ❌ error    2024-01-12 16:20     2024-01-12 16:25
+my-api          Working on feature X...        ?/50       2m        DONE         🔄 active   2024-01-15 10:30
+my-api          Build REST API for todos...    15/50      1h 15m    COMPLETE     ✅ success  2024-01-15 10:30
+my-api          Fix auth bug                   20/20      45m       FIXED        ⏹ max      2024-01-14 14:00
+frontend        Refactor cache layer           8/∞        30m       -            🚫 cancel  2024-01-13 09:15
+my-api          Add rate limiting              3/10       5m        DONE         ❌ error    2024-01-12 16:20
 
 ═════════════════════════════════════════════════════════════════════════════════════════════════════════
-Total: 4 sessions | ✅ 1 | ⏹ 1 | 🚫 1 | ❌ 1
+Total: 5 sessions | 🔄 1 | ✅ 1 | ⏹ 1 | 🚫 1 | ❌ 1
 ```
 
 **Formatting rules:**
 - Project: First 15 chars, truncated with `...` if longer
 - Task: First 30 chars, truncated with `...` if longer
-- Iters/Max: Show as `X/Y` where Y is max_iterations, or `X/∞` if max_iterations is 0 (unlimited)
+- Iters/Max: Show as `X/Y` where Y is max_iterations, or `X/∞` if max_iterations is 0 (unlimited); for active loops show `?/Y`
 - Duration: Format `duration_seconds` as:
   - `Xh Ym` if >= 1 hour
   - `Xm` if >= 1 minute but < 1 hour
   - `Xs` if < 1 minute
+  - For active loops, calculate from started_at to now
 - Promise: Show `completion_promise` value (first 12 chars), or `-` if null/empty
-- Outcome with emoji:
+- Status with emoji:
+  - Active (no completion) → `🔄 active`
   - `success` → `✅ success`
   - `max_iterations` → `⏹ max`
   - `cancelled` → `🚫 cancel`
   - `error` → `❌ error`
 - Started: Format `started_at` as `YYYY-MM-DD HH:MM` in local time
-- Ended: Format `ended_at` as `YYYY-MM-DD HH:MM` in local time
 
 **Summary line:**
-Count total sessions and breakdown by outcome type.
+Count total sessions and breakdown by status type (including active count).
 
 ### If no sessions match filters
 Say: "No sessions found matching your filters."
@@ -110,11 +132,13 @@ OPTIONS:
   --last N, -n N         Show last N sessions (default: 10)
   --project NAME, -p NAME  Filter by project name
   --outcome TYPE, -o TYPE  Filter by outcome (success, max_iterations, cancelled, error)
-  --all, -a              Show all sessions
+  --active, -a           Show only active (running) loops
+  --all                  Show all sessions
   -h, --help             Show this help
 
 EXAMPLES:
   /ralph-stats                          # Show last 10 sessions
+  /ralph-stats --active                 # Show only running loops
   /ralph-stats --last 20                # Show last 20 sessions
   /ralph-stats --project my-api         # Filter by project
   /ralph-stats --outcome success        # Show only successful loops
@@ -122,4 +146,10 @@ EXAMPLES:
 
 LOG LOCATION:
   ~/.claude/ralph-wiggum-logs/sessions.jsonl
+
+NOTE:
+  The log uses a two-entry format:
+  - Start entry: logged when loop begins (status: "active")
+  - Completion entry: logged when loop ends (status: "completed")
+  Sessions with only a start entry are currently running.
 ```

@@ -187,6 +187,8 @@ fi
 
 # Create session-specific state file
 STATE_FILE=".claude/ralph-loop.${SESSION_ID}.local.md"
+STATE_FILE_PATH="$(pwd)/$STATE_FILE"
+PROJECT_PATH="$(pwd)"
 
 cat > "$STATE_FILE" <<EOF
 ---
@@ -201,6 +203,21 @@ started_at: "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 
 $PROMPT
 EOF
+
+# Log session start to history
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+COMPLETION_PROMISE_LOG=""
+if [[ "$COMPLETION_PROMISE" != "null" ]]; then
+  COMPLETION_PROMISE_LOG="$COMPLETION_PROMISE"
+fi
+
+"$SCRIPT_DIR/log-session.sh" --start \
+  --session-id "$SESSION_ID" \
+  --project "$PROJECT_PATH" \
+  --task "$PROMPT" \
+  --state-file "$STATE_FILE_PATH" \
+  --max-iterations "$MAX_ITERATIONS" \
+  --completion-promise "$COMPLETION_PROMISE_LOG" 2>/dev/null || true
 
 # Output setup message
 cat <<EOF

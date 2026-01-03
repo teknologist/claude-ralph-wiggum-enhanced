@@ -8,7 +8,17 @@ Implementation of the Ralph Wiggum technique for iterative, self-referential AI 
 
 This fork adds the following features on top of the original Anthropic plugin:
 
-### v2.0.0
+### v2.1.0 - Dashboard
+- **Ralph Dashboard**: Web-based dashboard for monitoring and managing Ralph loops
+  - View all active and archived loops in real-time
+  - Cancel active loops directly from the browser
+  - Track statistics: success rates, durations, iteration counts
+  - Run with `bunx ralph-dashboard` or `npx ralph-dashboard`
+  - Configurable port (`--port`) and host (`--host 0.0.0.0` for public access)
+- **Active Loop Tracking**: Loops are now logged when they start (not just when they complete)
+- **Remote Cancellation**: Cancel loops from the dashboard by deleting the state file
+
+### v2.0.0 - Session Logging
 - **Session Logging**: All loop sessions are automatically logged to `~/.claude/ralph-wiggum-logs/sessions.jsonl` with structured JSON data including project name, task, iterations, duration, outcome, and timestamps
 - **`/ralph-stats` Command**: View historical loop session data with filtering by project, outcome, or count
 - **Cancellation Logging**: Loop cancellations via `/cancel-ralph` are now logged to session history
@@ -171,6 +181,42 @@ Total: 2 sessions | ✅ 1 | ⏹ 1 | 🚫 0 | ❌ 0
 ```
 
 **Log location:** `~/.claude/ralph-wiggum-logs/sessions.jsonl`
+
+### Ralph Dashboard
+
+View and manage your Ralph loops in a web browser.
+
+**Installation:**
+```bash
+# Using bun (recommended)
+bunx ralph-dashboard
+
+# Using npm
+npx ralph-dashboard
+```
+
+**Usage:**
+```bash
+# Start on localhost:3847
+bunx ralph-dashboard
+
+# Custom port
+bunx ralph-dashboard --port 8080
+
+# Public access (for remote monitoring)
+bunx ralph-dashboard --host 0.0.0.0
+
+# Both options
+bunx ralph-dashboard -p 8080 -h 0.0.0.0
+```
+
+**Features:**
+- Real-time view of active and archived loops
+- Statistics: success rate, average duration, iteration counts
+- Cancel active loops with one click
+- Automatic refresh every 5 seconds
+
+Open http://localhost:3847 in your browser to view the dashboard.
 
 ## Prompt Writing Best Practices
 
