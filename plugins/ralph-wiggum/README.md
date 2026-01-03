@@ -2,6 +2,28 @@
 
 Implementation of the Ralph Wiggum technique for iterative, self-referential AI development loops in Claude Code.
 
+> **Fork Notice**: This is a fork of the [official Anthropic Claude Code plugin](https://github.com/anthropics/claude-code-plugins). See [Enhancements](#enhancements-in-this-fork) below for additions made in this version.
+
+## Enhancements in This Fork
+
+This fork adds the following features on top of the original Anthropic plugin:
+
+### v2.0.0
+- **Session Logging**: All loop sessions are automatically logged to `~/.claude/ralph-wiggum-logs/sessions.jsonl` with structured JSON data including project name, task, iterations, duration, outcome, and timestamps
+- **`/ralph-stats` Command**: View historical loop session data with filtering by project, outcome, or count
+- **Cancellation Logging**: Loop cancellations via `/cancel-ralph` are now logged to session history
+- **Atomic Writes**: Log entries use atomic write pattern to prevent corruption
+- **jq Dependency Check**: Clear error message if `jq` is not installed
+
+### v1.x (Original Anthropic Features)
+- Session isolation for multiple concurrent loops
+- Progress tracking with elapsed time
+- File-based prompts with `--prompt-file`
+- Loop management commands (`/list-ralph-loops`, `/cancel-ralph`)
+- Completion promise detection
+
+---
+
 ## Features
 
 - **Session Isolation**: Multiple Claude Code terminals can run independent Ralph loops on the same project
