@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Ralph Wiggum Stop Hook
-# Prevents session exit when a ralph-loop is active
+# Prevents session exit when a ralph-loop is active for THIS session
 # Feeds Claude's output back as input to continue the loop
 
 set -euo pipefail
@@ -9,11 +9,19 @@ set -euo pipefail
 # Read hook input from stdin (advanced stop hook API)
 HOOK_INPUT=$(cat)
 
-# Check if ralph-loop is active
-RALPH_STATE_FILE=".claude/ralph-loop.local.md"
+# Extract session ID from hook input
+CURRENT_SESSION_ID=$(echo "$HOOK_INPUT" | jq -r '.session_id // empty')
+
+if [[ -z "$CURRENT_SESSION_ID" ]]; then
+  # No session ID available - allow exit (shouldn't happen)
+  exit 0
+fi
+
+# Check if ralph-loop is active for THIS session
+RALPH_STATE_FILE=".claude/ralph-loop.${CURRENT_SESSION_ID}.local.md"
 
 if [[ ! -f "$RALPH_STATE_FILE" ]]; then
-  # No active loop - allow exit
+  # No active loop for this session - allow exit
   exit 0
 fi
 
@@ -130,6 +138,26 @@ fi
 # Not complete - continue loop with SAME PROMPT
 NEXT_ITERATION=$((ITERATION + 1))
 
+# Calculate elapsed time
+STARTED_AT=$(echo "$FRONTMATTER" | grep '^started_at:' | sed 's/started_at: *//' | sed 's/^"\(.*\)"$/\1/')
+ELAPSED_STR="unknown"
+if [[ -n "$STARTED_AT" ]]; then
+  # Try macOS date format first, then Linux
+  START_EPOCH=$(date -j -f "%Y-%m-%dT%H:%M:%SZ" "$STARTED_AT" "+%s" 2>/dev/null || date -d "$STARTED_AT" "+%s" 2>/dev/null || echo "")
+  if [[ -n "$START_EPOCH" ]]; then
+    NOW_EPOCH=$(date "+%s")
+    ELAPSED_SECS=$((NOW_EPOCH - START_EPOCH))
+    ELAPSED_HOURS=$((ELAPSED_SECS / 3600))
+    ELAPSED_MINS=$(((ELAPSED_SECS % 3600) / 60))
+    ELAPSED_SEC=$((ELAPSED_SECS % 60))
+    if [[ $ELAPSED_HOURS -gt 0 ]]; then
+      ELAPSED_STR="${ELAPSED_HOURS}h ${ELAPSED_MINS}m"
+    else
+      ELAPSED_STR="${ELAPSED_MINS}m ${ELAPSED_SEC}s"
+    fi
+  fi
+fi
+
 # Extract prompt (everything after the closing ---)
 # Skip first --- line, skip until second --- line, then print everything after
 # Use i>=2 instead of i==2 to handle --- in prompt content
@@ -155,11 +183,11 @@ TEMP_FILE="${RALPH_STATE_FILE}.tmp.$$"
 sed "s/^iteration: .*/iteration: $NEXT_ITERATION/" "$RALPH_STATE_FILE" > "$TEMP_FILE"
 mv "$TEMP_FILE" "$RALPH_STATE_FILE"
 
-# Build system message with iteration count and completion promise info
+# Build system message with iteration count, elapsed time, and completion promise info
 if [[ "$COMPLETION_PROMISE" != "null" ]] && [[ -n "$COMPLETION_PROMISE" ]]; then
-  SYSTEM_MSG="🔄 Ralph iteration $NEXT_ITERATION | To stop: output <promise>$COMPLETION_PROMISE</promise> (ONLY when statement is TRUE - do not lie to exit!)"
+  SYSTEM_MSG="🔄 Ralph iteration $NEXT_ITERATION | Running for $ELAPSED_STR | To stop: output <promise>$COMPLETION_PROMISE</promise> (ONLY when TRUE!)"
 else
-  SYSTEM_MSG="🔄 Ralph iteration $NEXT_ITERATION | No completion promise set - loop runs infinitely"
+  SYSTEM_MSG="🔄 Ralph iteration $NEXT_ITERATION | Running for $ELAPSED_STR | No completion promise - runs forever"
 fi
 
 # Output JSON to block the stop and feed prompt back

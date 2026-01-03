@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Ralph Loop Setup Script
-# Creates state file for in-session Ralph loop
+# Creates session-specific state file for in-session Ralph loop
 
 set -euo pipefail
 
@@ -9,6 +9,7 @@ set -euo pipefail
 PROMPT_PARTS=()
 MAX_ITERATIONS=0
 COMPLETION_PROMISE="null"
+PROMPT_FILE=""
 
 # Parse options and positional arguments
 while [[ $# -gt 0 ]]; do
@@ -19,11 +20,13 @@ Ralph Loop - Interactive self-referential development loop
 
 USAGE:
   /ralph-loop [PROMPT...] [OPTIONS]
+  /ralph-loop --prompt-file <file> [OPTIONS]
 
 ARGUMENTS:
   PROMPT...    Initial prompt to start the loop (can be multiple words without quotes)
 
 OPTIONS:
+  --prompt-file <file>           Read prompt from markdown file instead of inline
   --max-iterations <n>           Maximum iterations before auto-stop (default: unlimited)
   --completion-promise '<text>'  Promise phrase (USE QUOTES for multi-word)
   -h, --help                     Show this help message
@@ -31,6 +34,9 @@ OPTIONS:
 DESCRIPTION:
   Starts a Ralph Wiggum loop in your CURRENT session. The stop hook prevents
   exit and feeds your output back as input until completion or iteration limit.
+
+  Each session gets its own loop - multiple terminals can run different loops
+  on the same project simultaneously.
 
   To signal completion, you must output: <promise>YOUR_PHRASE</promise>
 
@@ -41,22 +47,38 @@ DESCRIPTION:
 
 EXAMPLES:
   /ralph-loop Build a todo API --completion-promise 'DONE' --max-iterations 20
+  /ralph-loop --prompt-file ./tasks/api-task.md --max-iterations 50
   /ralph-loop --max-iterations 10 Fix the auth bug
   /ralph-loop Refactor cache layer  (runs forever)
-  /ralph-loop --completion-promise 'TASK COMPLETE' Create a REST API
 
 STOPPING:
   Only by reaching --max-iterations or detecting --completion-promise
   No manual stop - Ralph runs infinitely by default!
 
 MONITORING:
-  # View current iteration:
-  grep '^iteration:' .claude/ralph-loop.local.md
+  # List all active loops:
+  /list-ralph-loops
 
-  # View full state:
-  head -10 .claude/ralph-loop.local.md
+  # View your session's state:
+  cat .claude/ralph-loop.${CLAUDE_SESSION_ID}.local.md
 HELP_EOF
       exit 0
+      ;;
+    --prompt-file)
+      if [[ -z "${2:-}" ]]; then
+        echo "❌ Error: --prompt-file requires a file path" >&2
+        echo "" >&2
+        echo "   Valid examples:" >&2
+        echo "     --prompt-file ./tasks/my-task.md" >&2
+        echo "     --prompt-file prompts/api-build.md" >&2
+        exit 1
+      fi
+      if [[ ! -f "$2" ]]; then
+        echo "❌ Error: Prompt file not found: $2" >&2
+        exit 1
+      fi
+      PROMPT_FILE="$2"
+      shift 2
       ;;
     --max-iterations)
       if [[ -z "${2:-}" ]]; then
@@ -109,8 +131,18 @@ HELP_EOF
   esac
 done
 
-# Join all prompt parts with spaces
-PROMPT="${PROMPT_PARTS[*]}"
+# Join all prompt parts with spaces (for inline prompts)
+# Handle empty array case (when only --prompt-file is used)
+if [[ ${#PROMPT_PARTS[@]} -gt 0 ]]; then
+  PROMPT="${PROMPT_PARTS[*]}"
+else
+  PROMPT=""
+fi
+
+# If --prompt-file was specified, read prompt from file
+if [[ -n "$PROMPT_FILE" ]]; then
+  PROMPT=$(cat "$PROMPT_FILE")
+fi
 
 # Validate prompt is non-empty
 if [[ -z "$PROMPT" ]]; then
@@ -120,15 +152,31 @@ if [[ -z "$PROMPT" ]]; then
   echo "" >&2
   echo "   Examples:" >&2
   echo "     /ralph-loop Build a REST API for todos" >&2
+  echo "     /ralph-loop --prompt-file ./tasks/my-task.md" >&2
   echo "     /ralph-loop Fix the auth bug --max-iterations 20" >&2
-  echo "     /ralph-loop --completion-promise 'DONE' Refactor code" >&2
   echo "" >&2
   echo "   For all options: /ralph-loop --help" >&2
   exit 1
 fi
 
+# Get session ID from environment (set by SessionStart hook via CLAUDE_ENV_FILE)
+SESSION_ID="${CLAUDE_SESSION_ID:-unknown}"
+
+if [[ "$SESSION_ID" == "unknown" ]]; then
+  echo "⚠️  Warning: Session ID not available. Loop may not be session-isolated." >&2
+  echo "   This can happen if the plugin was just installed. Try restarting Claude Code." >&2
+  # Generate a fallback unique ID
+  SESSION_ID="fallback-$(date +%s)-$$"
+fi
+
 # Create state file for stop hook (markdown with YAML frontmatter)
 mkdir -p .claude
+
+# Generate description from first 60 chars of prompt
+DESCRIPTION=$(echo "$PROMPT" | tr '\n' ' ' | head -c 60)
+if [[ ${#PROMPT} -gt 60 ]]; then
+  DESCRIPTION="${DESCRIPTION}..."
+fi
 
 # Quote completion promise for YAML if it contains special chars or is not null
 if [[ -n "$COMPLETION_PROMISE" ]] && [[ "$COMPLETION_PROMISE" != "null" ]]; then
@@ -137,9 +185,14 @@ else
   COMPLETION_PROMISE_YAML="null"
 fi
 
-cat > .claude/ralph-loop.local.md <<EOF
+# Create session-specific state file
+STATE_FILE=".claude/ralph-loop.${SESSION_ID}.local.md"
+
+cat > "$STATE_FILE" <<EOF
 ---
 active: true
+session_id: "$SESSION_ID"
+description: "$DESCRIPTION"
 iteration: 1
 max_iterations: $MAX_ITERATIONS
 completion_promise: $COMPLETION_PROMISE_YAML
@@ -153,6 +206,8 @@ EOF
 cat <<EOF
 🔄 Ralph loop activated in this session!
 
+Session ID: ${SESSION_ID:0:12}...
+Description: $DESCRIPTION
 Iteration: 1
 Max iterations: $(if [[ $MAX_ITERATIONS -gt 0 ]]; then echo $MAX_ITERATIONS; else echo "unlimited"; fi)
 Completion promise: $(if [[ "$COMPLETION_PROMISE" != "null" ]]; then echo "${COMPLETION_PROMISE//\"/} (ONLY output when TRUE - do not lie!)"; else echo "none (runs forever)"; fi)
@@ -161,7 +216,9 @@ The stop hook is now active. When you try to exit, the SAME PROMPT will be
 fed back to you. You'll see your previous work in files, creating a
 self-referential loop where you iteratively improve on the same task.
 
-To monitor: head -10 .claude/ralph-loop.local.md
+To monitor this loop: cat $STATE_FILE
+To list all loops:    /list-ralph-loops
+To cancel this loop:  /cancel-ralph
 
 ⚠️  WARNING: This loop cannot be stopped manually! It will run infinitely
     unless you set --max-iterations or --completion-promise.

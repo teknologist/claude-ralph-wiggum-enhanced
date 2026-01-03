@@ -2,6 +2,13 @@
 
 Implementation of the Ralph Wiggum technique for iterative, self-referential AI development loops in Claude Code.
 
+## Features
+
+- **Session Isolation**: Multiple Claude Code terminals can run independent Ralph loops on the same project
+- **Progress Tracking**: Elapsed time display and iteration counting
+- **File-based Prompts**: Load complex prompts from markdown files with `--prompt-file`
+- **Loop Management**: List all active loops with `/list-ralph-loops`, cancel specific loops with `/cancel-ralph`
+
 ## What is Ralph?
 
 Ralph is a development methodology based on continuous AI agent loops. As Geoffrey Huntley describes it: **"Ralph is a Bash loop"** - a simple `while true` that repeatedly feeds an AI agent a prompt file, allowing it to iteratively improve its work until completion.
@@ -49,25 +56,61 @@ Claude will:
 
 ### /ralph-loop
 
-Start a Ralph loop in your current session.
+Start a Ralph loop in your current session. Each session gets its own isolated loop - you can run multiple loops in different terminals on the same project.
 
 **Usage:**
 ```bash
+# Inline prompt
 /ralph-loop "<prompt>" --max-iterations <n> --completion-promise "<text>"
+
+# File-based prompt (for complex tasks)
+/ralph-loop --prompt-file ./prompts/my-task.md --max-iterations 50 --completion-promise "DONE"
 ```
 
 **Options:**
+- `--prompt-file <path>` - Read prompt from a markdown file instead of inline
 - `--max-iterations <n>` - Stop after N iterations (default: unlimited)
-- `--completion-promise <text>` - Phrase that signals completion
+- `--completion-promise <text>` - Phrase that signals completion (use quotes for multi-word)
+
+**Examples:**
+```bash
+# Simple inline prompt
+/ralph-loop "Build a REST API for todos" --max-iterations 20
+
+# Complex prompt from file
+/ralph-loop --prompt-file ./tasks/api-spec.md --completion-promise "COMPLETE"
+
+# Mixed: file prompt with options
+/ralph-loop --prompt-file task.md --max-iterations 50 --completion-promise "ALL TESTS PASS"
+```
+
+### /list-ralph-loops
+
+List all active Ralph loops across all sessions in the current project.
+
+**Usage:**
+```bash
+/list-ralph-loops
+```
+
+Shows each loop's:
+- Session ID (truncated)
+- Task description
+- Current iteration / max iterations
+- Elapsed time since start
 
 ### /cancel-ralph
 
-Cancel the active Ralph loop.
+Cancel active Ralph loop(s). If multiple loops exist, you'll be prompted to select which to cancel.
 
 **Usage:**
 ```bash
 /cancel-ralph
 ```
+
+**Behavior:**
+- Single loop: Cancels immediately
+- Multiple loops: Shows list with descriptions, allows selecting one or all to cancel
 
 ## Prompt Writing Best Practices
 
