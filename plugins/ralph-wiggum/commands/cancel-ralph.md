@@ -42,19 +42,34 @@ Say: "No active Ralph loops found in this project."
 
 ## If exactly ONE loop found
 1. Show the loop details (session ID truncated to 8 chars, description, iteration count)
-2. Delete the state file using Bash: `rm <FILE>`
-3. Report: "Cancelled Ralph loop: <description> (was at iteration <ITER>)"
+2. Use AskUserQuestion to confirm cancellation:
+   ```
+   {
+     "question": "Cancel this Ralph loop?",
+     "header": "Confirm",
+     "options": [
+       {"label": "Yes, cancel it", "description": "Stop the loop and delete its state file"},
+       {"label": "No, keep it running", "description": "Leave the loop active"}
+     ],
+     "multiSelect": false
+   }
+   ```
+3. If confirmed, delete the state file using Bash: `rm <FILE>`
+4. Report: "Cancelled Ralph loop: <description> (was at iteration <ITER>)"
+5. If not confirmed, say: "Loop not cancelled."
 
 ## If MULTIPLE loops found
 1. Show a summary of all loops with their session IDs (truncated) and descriptions
 2. Use AskUserQuestion to ask which loop(s) to cancel:
    - Create options based on the loops found, using format: "Session <id>: <description>"
-   - Include an "All loops" option
+   - Include an "All loops" option as first choice
+   - Include a "None - keep all running" option as last choice
    - Use multiSelect: true to allow canceling multiple loops
-3. After user selection, delete the selected state file(s)
-4. Report which loops were cancelled
+3. If user selects "None", say: "No loops cancelled."
+4. Otherwise, delete the selected state file(s)
+5. Report which loops were cancelled
 
-Example AskUserQuestion format:
+Example AskUserQuestion format for multiple loops:
 ```
 {
   "question": "Which Ralph loop(s) do you want to cancel?",
@@ -62,7 +77,8 @@ Example AskUserQuestion format:
   "options": [
     {"label": "All loops", "description": "Cancel all active Ralph loops"},
     {"label": "abc12345: Build REST API...", "description": "Iteration 5, running since ..."},
-    {"label": "xyz78901: Fix auth bug...", "description": "Iteration 12, running since ..."}
+    {"label": "xyz78901: Fix auth bug...", "description": "Iteration 12, running since ..."},
+    {"label": "None - keep all running", "description": "Don't cancel any loops"}
   ],
   "multiSelect": true
 }
