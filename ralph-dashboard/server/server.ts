@@ -12,28 +12,28 @@ interface ServerOptions {
 const DIST_DIR = join(import.meta.dir, '..', 'dist');
 
 /**
- * Validate session ID to prevent path traversal and injection attacks.
+ * Validate loop ID to prevent path traversal and injection attacks.
  * Matches the validation logic in the bash hooks for consistency.
  * Allows UUIDs, alphanumeric with hyphens/underscores/dots (but not .. for path traversal).
  */
-function validateSessionId(sessionId: string): boolean {
+function validateLoopId(loopId: string): boolean {
   // Allow UUIDs, alphanumeric with hyphens/underscores/dots
   const validPattern = /^[a-zA-Z0-9._-]+$/;
   // Explicitly reject path traversal attempts
-  const noPathTraversal = !sessionId.includes('..');
+  const noPathTraversal = !loopId.includes('..');
 
-  return validPattern.test(sessionId) && noPathTraversal;
+  return validPattern.test(loopId) && noPathTraversal;
 }
 
 /**
- * Create a standardized error response for invalid session IDs.
+ * Create a standardized error response for invalid loop IDs.
  */
-function invalidSessionIdResponse(): Response {
+function invalidLoopIdResponse(): Response {
   return Response.json(
     {
-      error: 'INVALID_SESSION_ID',
+      error: 'INVALID_LOOP_ID',
       message:
-        'Invalid session ID format. Session ID must contain only alphanumeric characters, hyphens, underscores, and dots.',
+        'Invalid loop ID format. Loop ID must contain only alphanumeric characters, hyphens, underscores, and dots.',
     },
     { status: 400 }
   );
@@ -117,11 +117,11 @@ export function createServer(options: ServerOptions) {
           path.match(/^\/api\/sessions\/[^/]+$/) &&
           req.method === 'GET'
         ) {
-          const sessionId = path.split('/').pop()!;
-          if (!validateSessionId(sessionId)) {
-            response = invalidSessionIdResponse();
+          const loopId = path.split('/').pop()!;
+          if (!validateLoopId(loopId)) {
+            response = invalidLoopIdResponse();
           } else {
-            response = handleGetSession(sessionId);
+            response = handleGetSession(loopId);
           }
         }
         // POST /api/sessions/:id/cancel
@@ -130,11 +130,11 @@ export function createServer(options: ServerOptions) {
           req.method === 'POST'
         ) {
           const parts = path.split('/');
-          const sessionId = parts[parts.length - 2];
-          if (!validateSessionId(sessionId)) {
-            response = invalidSessionIdResponse();
+          const loopId = parts[parts.length - 2];
+          if (!validateLoopId(loopId)) {
+            response = invalidLoopIdResponse();
           } else {
-            response = handleCancelSession(sessionId);
+            response = handleCancelSession(loopId);
           }
         }
         // DELETE /api/sessions/:id
@@ -142,11 +142,11 @@ export function createServer(options: ServerOptions) {
           path.match(/^\/api\/sessions\/[^/]+$/) &&
           req.method === 'DELETE'
         ) {
-          const sessionId = path.split('/').pop()!;
-          if (!validateSessionId(sessionId)) {
-            response = invalidSessionIdResponse();
+          const loopId = path.split('/').pop()!;
+          if (!validateLoopId(loopId)) {
+            response = invalidLoopIdResponse();
           } else {
-            response = handleDeleteSession(sessionId);
+            response = handleDeleteSession(loopId);
           }
         }
         // 404 for unknown API routes

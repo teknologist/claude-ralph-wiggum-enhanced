@@ -326,4 +326,42 @@ describe('SessionRow', () => {
       expect(dateCells.length).toBeGreaterThan(0);
     });
   });
+
+  describe('backward compatibility', () => {
+    it('uses loop_id for cancel even when it equals session_id (legacy format)', async () => {
+      // In legacy log entries, loop_id may fall back to session_id value
+      // This test ensures the frontend uses loop_id consistently
+      const legacySession = createMockSession({
+        loop_id: 'shared-id-123',
+        session_id: 'shared-id-123', // Same value as loop_id (legacy fallback)
+        status: 'active',
+      });
+
+      renderRow(legacySession);
+
+      // Expand and click cancel
+      const row = screen.getByText('test-project').closest('tr');
+      fireEvent.click(row!);
+      fireEvent.click(screen.getByText('⏹ Cancel Loop'));
+
+      await waitFor(() => {
+        expect(screen.getByText('Cancel Loop?')).toBeInTheDocument();
+      });
+
+      // Confirm cancel
+      const buttons = screen.getAllByRole('button');
+      const confirmButton = buttons.find(
+        (btn) =>
+          btn.textContent === 'Cancel Loop' &&
+          btn.classList.contains('bg-claude-coral')
+      );
+      fireEvent.click(confirmButton!);
+
+      // Should use loop_id (which equals session_id in this case)
+      expect(mockMutate).toHaveBeenCalledWith(
+        'shared-id-123',
+        expect.any(Object)
+      );
+    });
+  });
 });

@@ -23,14 +23,14 @@ export function handleGetSessions(): Response {
   }
 }
 
-export function handleGetSession(sessionId: string): Response {
+export function handleGetSession(loopId: string): Response {
   try {
-    const session = getSessionById(sessionId);
+    const session = getSessionById(loopId);
 
     if (!session) {
       const response: ErrorResponse = {
         error: 'NOT_FOUND',
-        message: `Session not found: ${sessionId}`,
+        message: `Loop not found: ${loopId}`,
       };
       return Response.json(response, { status: 404 });
     }

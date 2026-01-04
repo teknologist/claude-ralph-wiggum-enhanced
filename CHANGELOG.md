@@ -7,6 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.0.7] - 2026-01-04
+
+### Added
+- **Progress Bar Visualization**: Visual progress bar for loop iterations in dashboard
+  - Color-coded: green (<50%), coral (50-69%), orange (70-89%), red (>=90%)
+  - Pulse animation for active sessions
+  - Two sizes: 'sm' for table rows, 'md' for detail view
+  - Shows percentage and iteration count labels
+  - 22 comprehensive tests for ProgressBar component
+- Loop ID and Session ID display fields in SessionDetail component with truncate tooltips
+- Atomic `--delete` flag for `log-session.sh` to delete state files immediately after logging
+- Test for backward-compatible sessions (legacy `loop_id` fallback)
+
+### Fixed
+- **Dashboard bug**: Frontend used `session_id` instead of `loop_id` for cancel/delete API calls, causing "Loop not found" errors
+- Renamed `sessionId` to `loopId` in server code for naming consistency
+
+### Changed
+- Error messages updated from "Session not found" to "Loop not found"
+- Renamed `validateSessionId` to `validateLoopId` in server validation
+
 ## [2.0.6] - 2026-01-04
 
 ### Added
