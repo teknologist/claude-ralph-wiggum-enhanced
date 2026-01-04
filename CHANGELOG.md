@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.0.10] - 2026-01-04
+
+### Added
+- **Mobile responsive dashboard design**: Swipe left to delete, swipe right to cancel loops
+- Dashboard progress bar visualization for loop iterations
+
+### Fixed
+- State file lookup in stop-hook now scans frontmatter for `session_id` match instead of relying on environment variable
+- Fallback to most recent state file by `started_at` timestamp when multiple exist
+
 ## [2.0.8] - 2026-01-04
 
 ### Fixed
