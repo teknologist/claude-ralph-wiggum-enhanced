@@ -299,4 +299,117 @@ describe('SessionDetail', () => {
       expect(screen.getByText('Iterations')).toBeInTheDocument();
     });
   });
+
+  describe('delete button features', () => {
+    const mockOnDelete = vi.fn();
+
+    beforeEach(() => {
+      mockOnDelete.mockClear();
+    });
+
+    it('shows delete button for non-active sessions when onDelete provided', () => {
+      render(
+        <SessionDetail
+          session={createMockSession({ status: 'success' })}
+          onCancel={mockOnCancel}
+          isCancelling={false}
+          onDelete={mockOnDelete}
+          isDeleting={false}
+        />
+      );
+      expect(screen.getByText('🗑 Delete Permanently')).toBeInTheDocument();
+    });
+
+    it('does not show delete button for active sessions', () => {
+      render(
+        <SessionDetail
+          session={createMockSession({ status: 'active' })}
+          onCancel={mockOnCancel}
+          isCancelling={false}
+          onDelete={mockOnDelete}
+          isDeleting={false}
+        />
+      );
+      expect(
+        screen.queryByText('🗑 Delete Permanently')
+      ).not.toBeInTheDocument();
+    });
+
+    it('does not show delete button when onDelete not provided', () => {
+      render(
+        <SessionDetail
+          session={createMockSession({ status: 'success' })}
+          onCancel={mockOnCancel}
+          isCancelling={false}
+        />
+      );
+      expect(
+        screen.queryByText('🗑 Delete Permanently')
+      ).not.toBeInTheDocument();
+    });
+
+    it('calls onDelete when delete button is clicked', () => {
+      render(
+        <SessionDetail
+          session={createMockSession({ status: 'cancelled' })}
+          onCancel={mockOnCancel}
+          isCancelling={false}
+          onDelete={mockOnDelete}
+          isDeleting={false}
+        />
+      );
+      fireEvent.click(screen.getByText('🗑 Delete Permanently'));
+      expect(mockOnDelete).toHaveBeenCalledTimes(1);
+    });
+
+    it('disables delete button when isDeleting is true', () => {
+      render(
+        <SessionDetail
+          session={createMockSession({ status: 'error' })}
+          onCancel={mockOnCancel}
+          isCancelling={false}
+          onDelete={mockOnDelete}
+          isDeleting={true}
+        />
+      );
+      const button = screen.getByText('Deleting...').closest('button');
+      expect(button).toBeDisabled();
+    });
+
+    it('shows loading state when isDeleting', () => {
+      render(
+        <SessionDetail
+          session={createMockSession({ status: 'max_iterations' })}
+          onCancel={mockOnCancel}
+          isCancelling={false}
+          onDelete={mockOnDelete}
+          isDeleting={true}
+        />
+      );
+      expect(screen.getByText('Deleting...')).toBeInTheDocument();
+    });
+
+    it('shows delete button for all non-active statuses', () => {
+      const nonActiveStatuses = [
+        'success',
+        'cancelled',
+        'error',
+        'max_iterations',
+      ] as const;
+
+      for (const status of nonActiveStatuses) {
+        const { unmount } = render(
+          <SessionDetail
+            session={createMockSession({ status })}
+            onCancel={mockOnCancel}
+            isCancelling={false}
+            onDelete={mockOnDelete}
+            isDeleting={false}
+          />
+        );
+        expect(screen.getByText('🗑 Delete Permanently')).toBeInTheDocument();
+        unmount();
+      }
+    });
+  });
 });

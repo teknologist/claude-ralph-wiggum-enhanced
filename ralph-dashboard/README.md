@@ -2,7 +2,7 @@
 
 [![CI](https://github.com/teknologist/claude-plugins-official/actions/workflows/ralph-dashboard-ci.yml/badge.svg)](https://github.com/teknologist/claude-plugins-official/actions/workflows/ralph-dashboard-ci.yml)
 [![codecov](https://codecov.io/gh/teknologist/claude-plugins-official/graph/badge.svg?flag=ralph-dashboard)](https://codecov.io/gh/teknologist/claude-plugins-official)
-![tests](https://img.shields.io/badge/tests-0_passing-brightgreen)
+![tests](https://img.shields.io/badge/tests-182_passing-brightgreen)
 [![npm version](https://img.shields.io/npm/v/ralph-dashboard?color=blue)](https://www.npmjs.com/package/ralph-dashboard)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.6-3178c6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 ![Bun](https://img.shields.io/badge/Bun-%3E%3D1.0-fbf0df?logo=bun&logoColor=black)
@@ -16,6 +16,7 @@ A web dashboard for monitoring and managing Ralph Wiggum loops.
 - **View Active Loops**: See all currently running Ralph Wiggum loops in real-time
 - **Loop History**: Browse archived loops with statistics and details
 - **Cancel Loops**: Stop active loops directly from the dashboard
+- **Delete History**: Permanently remove archived loops from history
 - **Statistics**: Track success rates, durations, and iteration counts
 
 ## Installation
@@ -119,6 +120,7 @@ ralph-dashboard/
 | GET | `/api/sessions` | List all sessions |
 | GET | `/api/sessions/:id` | Get session details |
 | POST | `/api/sessions/:id/cancel` | Cancel an active session |
+| DELETE | `/api/sessions/:id` | Permanently delete an archived session |
 
 ## Requirements
 

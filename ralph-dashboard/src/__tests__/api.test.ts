@@ -1,5 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { fetchSessions, fetchSession, cancelSession } from '../lib/api';
+import {
+  fetchSessions,
+  fetchSession,
+  cancelSession,
+  deleteSession,
+} from '../lib/api';
 import type { SessionsResponse, Session } from '../../server/types';
 
 describe('API client', () => {
@@ -115,6 +120,58 @@ describe('API client', () => {
 
       await expect(cancelSession('test-123')).rejects.toThrow(
         'Cannot cancel: not active'
+      );
+    });
+  });
+
+  describe('deleteSession', () => {
+    it('should delete session successfully', async () => {
+      const mockResponse = {
+        success: true,
+        message: 'Session permanently deleted from history',
+        session_id: 'test-123',
+      };
+
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve(mockResponse),
+      });
+
+      const result = await deleteSession('test-123');
+
+      expect(mockFetch).toHaveBeenCalledWith('/api/sessions/test-123', {
+        method: 'DELETE',
+      });
+      expect(result).toEqual(mockResponse);
+    });
+
+    it('should throw error when trying to delete active session', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: false,
+        json: () =>
+          Promise.resolve({
+            error: 'INVALID_STATE',
+            message: 'Cannot delete active session',
+          }),
+      });
+
+      await expect(deleteSession('test-123')).rejects.toThrow(
+        'Cannot delete active session'
+      );
+    });
+
+    it('should throw error when session not found', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: false,
+        json: () =>
+          Promise.resolve({
+            error: 'NOT_FOUND',
+            message: 'Session not found',
+          }),
+      });
+
+      await expect(deleteSession('nonexistent')).rejects.toThrow(
+        'Session not found'
       );
     });
   });

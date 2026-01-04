@@ -2,6 +2,7 @@ import type {
   Session,
   SessionsResponse,
   CancelResponse,
+  DeleteResponse,
   ErrorResponse,
 } from '../../server/types';
 
@@ -30,6 +31,19 @@ export async function cancelSession(
 ): Promise<CancelResponse> {
   const response = await fetch(`${API_BASE}/sessions/${sessionId}/cancel`, {
     method: 'POST',
+  });
+  if (!response.ok) {
+    const error: ErrorResponse = await response.json();
+    throw new Error(error.message);
+  }
+  return response.json();
+}
+
+export async function deleteSession(
+  sessionId: string
+): Promise<DeleteResponse> {
+  const response = await fetch(`${API_BASE}/sessions/${sessionId}`, {
+    method: 'DELETE',
   });
   if (!response.ok) {
     const error: ErrorResponse = await response.json();

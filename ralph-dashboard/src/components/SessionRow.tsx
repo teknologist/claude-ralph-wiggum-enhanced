@@ -3,6 +3,7 @@ import type { Session } from '../../server/types';
 import { SessionDetail } from './SessionDetail';
 import { ConfirmModal } from './ConfirmModal';
 import { useCancelLoop } from '../hooks/useCancelLoop';
+import { useDeleteSession } from '../hooks/useDeleteSession';
 
 interface SessionRowProps {
   session: Session;
@@ -11,7 +12,9 @@ interface SessionRowProps {
 export function SessionRow({ session }: SessionRowProps) {
   const [isExpanded, setIsExpanded] = useState(false);
   const [showCancelModal, setShowCancelModal] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
   const cancelMutation = useCancelLoop();
+  const deleteMutation = useDeleteSession();
 
   const formatDate = (dateStr: string): string => {
     const date = new Date(dateStr);
@@ -85,6 +88,22 @@ export function SessionRow({ session }: SessionRowProps) {
     });
   };
 
+  const handleDelete = () => {
+    setShowDeleteModal(true);
+  };
+
+  const confirmDelete = () => {
+    deleteMutation.mutate(session.session_id, {
+      onSuccess: () => {
+        setShowDeleteModal(false);
+        setIsExpanded(false);
+      },
+      onError: (error) => {
+        alert(`Failed to delete: ${error.message}`);
+      },
+    });
+  };
+
   const truncateTask = (task: string | undefined, maxLength: number = 60) => {
     if (!task) return '—';
     if (task.length <= maxLength) return task;
@@ -135,6 +154,8 @@ export function SessionRow({ session }: SessionRowProps) {
               session={session}
               onCancel={handleCancel}
               isCancelling={cancelMutation.isPending}
+              onDelete={handleDelete}
+              isDeleting={deleteMutation.isPending}
             />
           </td>
         </tr>
@@ -148,6 +169,16 @@ export function SessionRow({ session }: SessionRowProps) {
         onConfirm={confirmCancel}
         onCancel={() => setShowCancelModal(false)}
         isLoading={cancelMutation.isPending}
+      />
+      <ConfirmModal
+        isOpen={showDeleteModal}
+        title="Delete Permanently?"
+        message={`Are you sure you want to permanently delete "${session.project_name}" from history? This action cannot be undone.`}
+        confirmLabel="Delete Permanently"
+        cancelLabel="Keep in History"
+        onConfirm={confirmDelete}
+        onCancel={() => setShowDeleteModal(false)}
+        isLoading={deleteMutation.isPending}
       />
     </>
   );

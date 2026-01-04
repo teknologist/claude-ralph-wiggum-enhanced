@@ -6,6 +6,7 @@ import {
   getSessionById,
   getLogFilePath,
   readIterationFromStateFile,
+  deleteSession,
 } from '../services/log-parser';
 import type { LogEntry, StartLogEntry, CompletionLogEntry } from '../types';
 import { writeFileSync, mkdirSync, rmSync } from 'fs';
@@ -439,6 +440,13 @@ Content`;
     it('returns empty array when log file does not exist', () => {
       const entries = parseLogFile();
       expect(Array.isArray(entries)).toBe(true);
+    });
+  });
+
+  describe('deleteSession', () => {
+    it('returns false when log file does not exist', () => {
+      const result = deleteSession('non-existent-session-id');
+      expect(result).toBe(false);
     });
   });
 });

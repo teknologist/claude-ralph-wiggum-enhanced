@@ -1,6 +1,6 @@
 import { homedir } from 'os';
 import { join } from 'path';
-import { readFileSync, existsSync } from 'fs';
+import { readFileSync, existsSync, writeFileSync, renameSync } from 'fs';
 import type {
   LogEntry,
   StartLogEntry,
@@ -238,4 +238,53 @@ export function getSessions(): Session[] {
 export function getSessionById(sessionId: string): Session | null {
   const sessions = getSessions();
   return sessions.find((s) => s.session_id === sessionId) ?? null;
+}
+
+/**
+ * Permanently delete a session from the log file.
+ * Removes both start and completion entries for the given session_id.
+ * Returns true if session was found and deleted, false otherwise.
+ */
+export function deleteSession(sessionId: string): boolean {
+  if (!existsSync(LOG_FILE)) {
+    return false;
+  }
+
+  const content = readFileSync(LOG_FILE, 'utf-8');
+  const lines = content.split('\n').filter((line) => line.trim());
+
+  // Filter out all entries for this session
+  const filteredLines: string[] = [];
+  let found = false;
+
+  for (const line of lines) {
+    try {
+      const entry = JSON.parse(line) as LogEntry;
+      if (entry.session_id === sessionId) {
+        found = true;
+        // Skip this entry (delete it)
+        continue;
+      }
+      filteredLines.push(line);
+    } catch {
+      // Keep malformed lines as-is
+      filteredLines.push(line);
+    }
+  }
+
+  if (!found) {
+    return false;
+  }
+
+  // Write atomically using temp file + rename to prevent race conditions
+  const tempFile = LOG_FILE + '.tmp.' + Date.now();
+  writeFileSync(
+    tempFile,
+    filteredLines.join('\n') + (filteredLines.length > 0 ? '\n' : '')
+  );
+
+  // Atomic rename (safe on same filesystem)
+  renameSync(tempFile, LOG_FILE);
+
+  return true;
 }

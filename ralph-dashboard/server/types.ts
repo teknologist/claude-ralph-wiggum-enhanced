@@ -53,6 +53,12 @@ export interface CancelResponse {
   session_id: string;
 }
 
+export interface DeleteResponse {
+  success: boolean;
+  message: string;
+  session_id: string;
+}
+
 export interface ErrorResponse {
   error: string;
   message: string;

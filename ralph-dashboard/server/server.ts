@@ -2,6 +2,7 @@ import { join } from 'path';
 import { existsSync, readFileSync } from 'fs';
 import { handleGetSessions, handleGetSession } from './api/sessions';
 import { handleCancelSession } from './api/cancel';
+import { handleDeleteSession } from './api/delete';
 
 interface ServerOptions {
   port: number;
@@ -59,7 +60,7 @@ export function createServer(options: ServerOptions) {
         // CORS headers for API
         const corsHeaders = {
           'Access-Control-Allow-Origin': '*',
-          'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+          'Access-Control-Allow-Methods': 'GET, POST, DELETE, OPTIONS',
           'Access-Control-Allow-Headers': 'Content-Type',
         };
 
@@ -90,6 +91,14 @@ export function createServer(options: ServerOptions) {
           const parts = path.split('/');
           const sessionId = parts[parts.length - 2];
           response = handleCancelSession(sessionId);
+        }
+        // DELETE /api/sessions/:id
+        else if (
+          path.match(/^\/api\/sessions\/[^/]+$/) &&
+          req.method === 'DELETE'
+        ) {
+          const sessionId = path.split('/').pop()!;
+          response = handleDeleteSession(sessionId);
         }
         // 404 for unknown API routes
         else {
