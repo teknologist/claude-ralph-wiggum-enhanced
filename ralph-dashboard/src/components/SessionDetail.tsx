@@ -134,14 +134,26 @@ export function SessionDetail({
                 </p>
               </div>
 
-              {/* Started At */}
-              <div>
-                <label className="text-xs sm:text-sm font-medium text-gray-500">
-                  Started
-                </label>
-                <p className="mt-1 text-claude-dark text-xs sm:text-sm">
-                  {formatDate(session.started_at)}
-                </p>
+              {/* Started At and Ended At */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+                <div>
+                  <label className="text-xs sm:text-sm font-medium text-gray-500">
+                    Started
+                  </label>
+                  <p className="mt-1 text-claude-dark text-xs sm:text-sm">
+                    {formatDate(session.started_at)}
+                  </p>
+                </div>
+                {session.ended_at && (
+                  <div>
+                    <label className="text-xs sm:text-sm font-medium text-gray-500">
+                      Ended
+                    </label>
+                    <p className="mt-1 text-claude-dark text-xs sm:text-sm">
+                      {formatDate(session.ended_at)}
+                    </p>
+                  </div>
+                )}
               </div>
 
               {/* Task */}

@@ -366,6 +366,38 @@ describe('SessionDetail', () => {
       expect(screen.getByText('Duration')).toBeInTheDocument();
       expect(screen.getByText('Iterations')).toBeInTheDocument();
     });
+
+    it('renders Ended label when session has ended_at', () => {
+      render(
+        <SessionDetail
+          session={createMockSession({
+            status: 'success',
+            ended_at: '2024-01-15T10:05:00.000Z',
+          })}
+          onCancel={mockOnCancel}
+          isCancelling={false}
+        />
+      );
+      // Click "Show details" to reveal collapsible section labels
+      fireEvent.click(screen.getByText('Show details'));
+      expect(screen.getByText('Ended')).toBeInTheDocument();
+    });
+
+    it('does not render Ended label when session has no ended_at', () => {
+      render(
+        <SessionDetail
+          session={createMockSession({
+            status: 'active',
+            ended_at: null,
+          })}
+          onCancel={mockOnCancel}
+          isCancelling={false}
+        />
+      );
+      // Click "Show details" to reveal collapsible section labels
+      fireEvent.click(screen.getByText('Show details'));
+      expect(screen.queryByText('Ended')).not.toBeInTheDocument();
+    });
   });
 
   describe('delete button features', () => {
