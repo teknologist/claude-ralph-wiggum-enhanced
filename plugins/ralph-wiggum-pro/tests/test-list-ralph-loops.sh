@@ -268,11 +268,12 @@ fi
 
 run_test "Elapsed time - hours and minutes format"
 mkdir -p "$TEST_DIR/project7/.claude"
-# Start time 2 hours and 30 minutes ago (use local time, not UTC)
+# Calculate 2h30m ago using epoch seconds (portable across macOS/Linux)
+PAST_EPOCH=$(($(date +%s) - 2*3600 - 30*60))
 if [[ "$(uname)" == "Darwin" ]]; then
-  PAST=$(date -v-2H -v-30M +%Y-%m-%dT%H:%M:%SZ)
+  PAST=$(date -r $PAST_EPOCH +%Y-%m-%dT%H:%M:%SZ)
 else
-  PAST=$(date -d "2 hours 30 minutes ago" +%Y-%m-%dT%H:%M:%SZ)
+  PAST=$(date -d "@$PAST_EPOCH" +%Y-%m-%dT%H:%M:%SZ)
 fi
 cat > "$TEST_DIR/project7/.claude/ralph-loop.session-old.local.md" <<EOF
 ---
