@@ -2,6 +2,7 @@ import { useState } from 'react';
 import type { Session } from '../../server/types';
 import { SessionDetail } from './SessionDetail';
 import { ConfirmModal } from './ConfirmModal';
+import { ProgressBar } from './ProgressBar';
 import { useCancelLoop } from '../hooks/useCancelLoop';
 import { useDeleteSession } from '../hooks/useDeleteSession';
 
@@ -141,10 +142,13 @@ export function SessionRow({ session }: SessionRowProps) {
           {formatDuration(session.duration_seconds)}
         </td>
         <td className="px-4 py-3 text-gray-600">
-          {/* Show N/A only when iterations is truly unknown (null/undefined), 0 is valid */}
-          {session.iterations != null
-            ? `${session.iterations}/${session.max_iterations}`
-            : `N/A`}
+          <ProgressBar
+            current={session.iterations}
+            max={session.max_iterations}
+            size="sm"
+            showLabel
+            status={session.status}
+          />
         </td>
       </tr>
       {isExpanded && (

@@ -92,7 +92,7 @@ describe('SessionDetail', () => {
           isCancelling={false}
         />
       );
-      expect(screen.getByText('7 / 20')).toBeInTheDocument();
+      expect(screen.getByText('7 / 20 iterations')).toBeInTheDocument();
     });
 
     it('shows N/A for null iterations', () => {
@@ -114,7 +114,7 @@ describe('SessionDetail', () => {
           isCancelling={false}
         />
       );
-      expect(screen.getByText('0 / 10')).toBeInTheDocument();
+      expect(screen.getByText('0 / 10 iterations')).toBeInTheDocument();
     });
 
     it('renders loop_id', () => {

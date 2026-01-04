@@ -1,4 +1,5 @@
 import type { Session } from '../../server/types';
+import { ProgressBar } from './ProgressBar';
 
 interface SessionDetailProps {
   session: Session;
@@ -104,16 +105,15 @@ export function SessionDetail({
         </div>
 
         {/* Iterations */}
-        <div>
-          <label className="text-sm font-medium text-gray-500">
-            Iterations
-          </label>
-          <p className="mt-1 text-claude-dark">
-            {/* Show N/A only when iterations is truly unknown (null/undefined), 0 is valid */}
-            {session.iterations != null
-              ? `${session.iterations} / ${session.max_iterations}`
-              : `N/A`}
-          </p>
+        <div className="md:col-span-2">
+          <ProgressBar
+            current={session.iterations}
+            max={session.max_iterations}
+            size="md"
+            showLabel
+            showPercentage
+            status={session.status}
+          />
         </div>
 
         {/* State File Path (for active sessions) */}
