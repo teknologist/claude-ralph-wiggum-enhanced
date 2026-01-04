@@ -1,0 +1,3 @@
+{"message":{"role":"user","content":[{"type":"text","text":"Continue working on the task"}]}}
+{"message":{"role":"assistant","content":[{"type":"text","text":"I have completed the implementation. <promise>TASK COMPLETE</promise>"}]}}
+{"message":{"role":"assistant","content":[{"type":"tool_use","id":"toolu_123","name":"Write","input":{"file_path":"/tmp/done.txt","content":"done"}}]}}

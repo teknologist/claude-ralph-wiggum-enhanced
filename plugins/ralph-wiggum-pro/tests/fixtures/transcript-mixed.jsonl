@@ -1,0 +1,1 @@
+{"message":{"role":"assistant","content":[{"type":"text","text":"I'll check the server status now."},{"type":"tool_use","id":"toolu_01ABC","name":"Bash","input":{"command":"curl http://localhost:3050/api/health"}}]}}
