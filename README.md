@@ -25,12 +25,14 @@ This fork adds the following features on top of the original Anthropic plugin:
 - **Atomic Writes**: Log entries use atomic write pattern to prevent corruption
 - **jq Dependency Check**: Clear error message if `jq` is not installed
 
-### v1.x (Original Anthropic Features)
-- Session isolation for multiple concurrent loops
-- Progress tracking with elapsed time
-- File-based prompts with `--prompt-file`
-- Loop management commands (`/list-ralph-loops`, `/cancel-ralph`)
-- Completion promise detection
+### v1.1.0 - Session Isolation
+- **Multi-Session Support**: Multiple Claude Code terminals can run independent Ralph loops on the same project simultaneously
+- **Session-Scoped State Files**: Each session gets its own state file (`.claude/ralph-loop.{session_id}.local.md`)
+- **SessionStart Hook**: Persists `CLAUDE_SESSION_ID` to environment for session tracking
+- **Multi-Session Commands**: `/list-ralph-loops` and `/cancel-ralph` updated to be session-aware
+- **Confirmation Prompts**: `/cancel-ralph` now asks for confirmation before cancelling
+- **Zsh Compatibility**: Fixed glob expansion errors in list and cancel commands
+- **Comprehensive Test Suite**: Added tests for session isolation, state file parsing, and security validation
 
 ---
 
