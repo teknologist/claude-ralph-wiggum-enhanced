@@ -11,6 +11,9 @@ MAX_ITERATIONS=0
 COMPLETION_PROMISE="null"
 PROMPT_FILE=""
 
+# Save original arguments for fallback detection (handles multi-line input edge cases)
+ORIGINAL_ARGS="$*"
+
 # Parse options and positional arguments
 while [[ $# -gt 0 ]]; do
   case $1 in
@@ -140,6 +143,11 @@ HELP_EOF
         exit 1
       fi
       COMPLETION_PROMISE="$2"
+      # Remove surrounding quotes if present (handles literal quotes from $ARGUMENTS expansion)
+      COMPLETION_PROMISE="${COMPLETION_PROMISE#\"}"
+      COMPLETION_PROMISE="${COMPLETION_PROMISE%\"}"
+      COMPLETION_PROMISE="${COMPLETION_PROMISE#\'}"
+      COMPLETION_PROMISE="${COMPLETION_PROMISE%\'}"
       shift 2
       ;;
     *)
@@ -178,20 +186,123 @@ if [[ -z "$PROMPT" ]]; then
   exit 1
 fi
 
-# Extract --completion-promise from prompt text if not explicitly set
-# Handles both --completion-promise=VALUE and --completion-promise VALUE formats
-if [[ "$COMPLETION_PROMISE" == "null" ]]; then
-  # Try --completion-promise=VALUE format (with optional quotes)
-  if [[ "$PROMPT" =~ --completion-promise=[\"\']*([^\"\'[:space:]]+)[\"\']* ]]; then
-    COMPLETION_PROMISE="${BASH_REMATCH[1]}"
-    # Remove from prompt
-    PROMPT=$(echo "$PROMPT" | sed -E 's/[[:space:]]*--completion-promise=[\"'\'']*[^\"'\''[:space:]]+[\"'\'']*[[:space:]]*/ /g' | sed 's/  */ /g' | sed 's/^ //;s/ $//')
-  # Try --completion-promise VALUE format (space separated)
-  elif [[ "$PROMPT" =~ --completion-promise[[:space:]]+[\"\']*([^\"\'[:space:]]+)[\"\']* ]]; then
-    COMPLETION_PROMISE="${BASH_REMATCH[1]}"
-    # Remove from prompt
-    PROMPT=$(echo "$PROMPT" | sed -E 's/[[:space:]]*--completion-promise[[:space:]]+[\"'\'']*[^\"'\''[:space:]]+[\"'\'']*[[:space:]]*/ /g' | sed 's/  */ /g' | sed 's/^ //;s/ $//')
+# Fallback: Extract options from original args if they weren't parsed
+# This handles edge cases where multi-line input causes argument parsing issues
+if [[ $MAX_ITERATIONS -eq 0 ]]; then
+  # Try --max-iterations=VALUE format
+  if [[ "$ORIGINAL_ARGS" =~ --max-iterations=([0-9]+) ]]; then
+    MAX_ITERATIONS="${BASH_REMATCH[1]}"
+  # Try --max-iterations VALUE format
+  elif [[ "$ORIGINAL_ARGS" =~ --max-iterations[[:space:]]+([0-9]+) ]]; then
+    MAX_ITERATIONS="${BASH_REMATCH[1]}"
   fi
+fi
+
+if [[ "$COMPLETION_PROMISE" == "null" ]]; then
+  # Try --completion-promise="quoted value" format (double quotes, supports multi-word)
+  if [[ "$ORIGINAL_ARGS" =~ --completion-promise=\"([^\"]+)\" ]]; then
+    COMPLETION_PROMISE="${BASH_REMATCH[1]}"
+  # Try --completion-promise='quoted value' format (single quotes, supports multi-word)
+  elif [[ "$ORIGINAL_ARGS" =~ --completion-promise=\'([^\']+)\' ]]; then
+    COMPLETION_PROMISE="${BASH_REMATCH[1]}"
+  # Try --completion-promise=VALUE format (unquoted single word)
+  elif [[ "$ORIGINAL_ARGS" =~ --completion-promise=([^[:space:]\"\']+) ]]; then
+    COMPLETION_PROMISE="${BASH_REMATCH[1]}"
+  # Try --completion-promise "quoted value" format (space + double quotes)
+  elif [[ "$ORIGINAL_ARGS" =~ --completion-promise[[:space:]]+\"([^\"]+)\" ]]; then
+    COMPLETION_PROMISE="${BASH_REMATCH[1]}"
+  # Try --completion-promise 'quoted value' format (space + single quotes)
+  elif [[ "$ORIGINAL_ARGS" =~ --completion-promise[[:space:]]+\'([^\']+)\' ]]; then
+    COMPLETION_PROMISE="${BASH_REMATCH[1]}"
+  # Try --completion-promise VALUE format (space + unquoted single word)
+  elif [[ "$ORIGINAL_ARGS" =~ --completion-promise[[:space:]]+([^[:space:]\"\']+) ]]; then
+    COMPLETION_PROMISE="${BASH_REMATCH[1]}"
+  fi
+  # Strip any remaining quotes from extracted value
+  if [[ "$COMPLETION_PROMISE" != "null" ]]; then
+    COMPLETION_PROMISE="${COMPLETION_PROMISE#\"}"
+    COMPLETION_PROMISE="${COMPLETION_PROMISE%\"}"
+    COMPLETION_PROMISE="${COMPLETION_PROMISE#\'}"
+    COMPLETION_PROMISE="${COMPLETION_PROMISE%\'}"
+  fi
+fi
+
+# Helper function to clean up whitespace in prompt text
+# Normalizes multiple spaces to single space and strips leading/trailing whitespace
+_cleanup_whitespace() {
+  local text="$1"
+  echo "$text" | sed 's/  */ /g' | sed 's/^ //;s/ $//'
+}
+
+# Helper function to remove option patterns from prompt
+# Handles all formats: --opt=value, --opt "value", --opt 'value', --opt value
+_remove_option_from_prompt() {
+  local prompt="$1"
+  local option_name="$2"
+
+  # Build patterns for all formats
+  # 1. --option="value" (double quoted)
+  prompt=$(echo "$prompt" | sed -E "s/[[:space:]]*${option_name}=\"[^\"]*\"[[:space:]]*/ /g")
+  # 2. --option='value' (single quoted)
+  prompt=$(echo "$prompt" | sed -E "s/[[:space:]]*${option_name}='[^']*'[[:space:]]*/ /g")
+  # 3. --option=value (unquoted, no spaces)
+  prompt=$(echo "$prompt" | sed -E "s/[[:space:]]*${option_name}=[^[:space:]\"]+[[:space:]]*/ /g")
+  # 4. --option "value" (space + double quoted)
+  prompt=$(echo "$prompt" | sed -E "s/[[:space:]]*${option_name}[[:space:]]+\"[^\"]*\"[[:space:]]*/ /g")
+  # 5. --option 'value' (space + single quoted)
+  prompt=$(echo "$prompt" | sed -E "s/[[:space:]]*${option_name}[[:space:]]+'[^']+'[[:space:]]*/ /g")
+  # 6. --option value (space + unquoted)
+  prompt=$(echo "$prompt" | sed -E "s/[[:space:]]*${option_name}[[:space:]]+[^[:space:]\"]+[[:space:]]*/ /g")
+
+  _cleanup_whitespace "$prompt"
+}
+
+# Helper function to extract option value from prompt text
+# Returns the value or empty string if not found
+_extract_option_from_prompt() {
+  local prompt="$1"
+  local option_name="$2"
+  local value=""
+
+  # Try all formats in order of specificity
+  if [[ "$prompt" =~ ${option_name}=\"([^\"]+)\" ]]; then
+    value="${BASH_REMATCH[1]}"
+  elif [[ "$prompt" =~ ${option_name}=\'([^\']+)\' ]]; then
+    value="${BASH_REMATCH[1]}"
+  elif [[ "$prompt" =~ ${option_name}=([^[:space:]\"\']+) ]]; then
+    value="${BASH_REMATCH[1]}"
+  elif [[ "$prompt" =~ ${option_name}[[:space:]]+\"([^\"]+)\" ]]; then
+    value="${BASH_REMATCH[1]}"
+  elif [[ "$prompt" =~ ${option_name}[[:space:]]+\'([^\']+)\' ]]; then
+    value="${BASH_REMATCH[1]}"
+  elif [[ "$prompt" =~ ${option_name}[[:space:]]+([^[:space:]\"\']+) ]]; then
+    value="${BASH_REMATCH[1]}"
+  fi
+
+  echo "$value"
+}
+
+# Also check the prompt text itself for embedded options (secondary fallback)
+# and clean up any options that ended up in the prompt text
+if [[ "$PROMPT" =~ --max-iterations[=[:space:]]+[0-9]+ ]]; then
+  # Extract if not already set
+  if [[ $MAX_ITERATIONS -eq 0 ]]; then
+    EXTRACTED=$(_extract_option_from_prompt "$PROMPT" "--max-iterations")
+    if [[ "$EXTRACTED" =~ ^[0-9]+$ ]]; then
+      MAX_ITERATIONS="$EXTRACTED"
+    fi
+  fi
+  # Remove from prompt using helper function
+  PROMPT=$(_remove_option_from_prompt "$PROMPT" "--max-iterations")
+fi
+
+if [[ "$PROMPT" =~ --completion-promise ]]; then
+  # Try various formats to extract the promise value
+  if [[ "$COMPLETION_PROMISE" == "null" ]]; then
+    COMPLETION_PROMISE=$(_extract_option_from_prompt "$PROMPT" "--completion-promise")
+  fi
+  # Remove from prompt using helper function
+  PROMPT=$(_remove_option_from_prompt "$PROMPT" "--completion-promise")
 fi
 
 # Get session ID from environment (set by SessionStart hook via CLAUDE_ENV_FILE)
@@ -202,6 +313,15 @@ if [[ "$SESSION_ID" == "unknown" ]]; then
   echo "   This can happen if the plugin was just installed. Try restarting Claude Code." >&2
   # Generate a fallback unique ID
   SESSION_ID="fallback-$(date +%s)-$$"
+fi
+
+# Validate session ID format to prevent path traversal attacks
+# Allow UUIDs, alphanumeric with hyphens/underscores/dots (but not .. for path traversal)
+if [[ ! "$SESSION_ID" =~ ^[a-zA-Z0-9._-]+$ ]] || [[ "$SESSION_ID" == *".."* ]]; then
+  echo "❌ Error: Invalid session ID format (security check)" >&2
+  echo "   Session ID contains unsafe characters." >&2
+  echo "   This should not happen with normal Claude Code operation." >&2
+  exit 1
 fi
 
 # Create state file for stop hook (markdown with YAML frontmatter)

@@ -394,6 +394,106 @@ else
 fi
 
 # ============================================================================
+# MULTI-MESSAGE TRANSCRIPT TESTS (would have caught single-message bug)
+# ============================================================================
+
+run_test "Promise in earlier message, tool call in final → still detects promise"
+SESSION="session-promise-then-tool"
+create_state_file "$SESSION" 5 100 "TASK COMPLETE"
+# Realistic scenario: Claude outputs promise, then makes a tool call
+cat > "$TEST_DIR/transcript.jsonl" <<'EOF'
+{"role":"user","message":{"content":[{"type":"text","text":"Continue working"}]}}
+{"role":"assistant","message":{"content":[{"type":"text","text":"I have completed the task. <promise>TASK COMPLETE</promise>"}]}}
+{"role":"assistant","message":{"content":[{"type":"tool_use","id":"toolu_123","name":"Write","input":{"file_path":"/tmp/test.txt","content":"done"}}]}}
+EOF
+
+HOOK_INPUT=$(jq -n --arg sid "$SESSION" --arg tp "$TEST_DIR/transcript.jsonl" '{session_id: $sid, transcript_path: $tp, cwd: "."}')
+RESULT=$(echo "$HOOK_INPUT" | "$HOOK_SCRIPT" 2>&1) || true
+
+if [[ "$RESULT" != *'"decision": "block"'* ]]; then
+  pass "Promise detected even when followed by tool call"
+else
+  fail "Should detect promise in earlier message" "Result: $RESULT"
+  exit 1
+fi
+
+run_test "Promise in first message, more text in later messages → still detects"
+SESSION="session-promise-first"
+create_state_file "$SESSION" 5 100 "DONE"
+cat > "$TEST_DIR/transcript.jsonl" <<'EOF'
+{"role":"user","message":{"content":[{"type":"text","text":"Start"}]}}
+{"role":"assistant","message":{"content":[{"type":"text","text":"<promise>DONE</promise> Task completed."}]}}
+{"role":"assistant","message":{"content":[{"type":"text","text":"Here are the final results..."}]}}
+EOF
+
+HOOK_INPUT=$(jq -n --arg sid "$SESSION" --arg tp "$TEST_DIR/transcript.jsonl" '{session_id: $sid, transcript_path: $tp, cwd: "."}')
+RESULT=$(echo "$HOOK_INPUT" | "$HOOK_SCRIPT" 2>&1) || true
+
+if [[ "$RESULT" != *'"decision": "block"'* ]]; then
+  pass "Promise in first message still detected"
+else
+  fail "Should detect promise in first message" "Result: $RESULT"
+  exit 1
+fi
+
+run_test "Final message is tool-only (no text) → still finds promise in earlier message"
+SESSION="session-tool-only-final"
+create_state_file "$SESSION" 5 100 "COMPLETE"
+cat > "$TEST_DIR/transcript.jsonl" <<'EOF'
+{"role":"user","message":{"content":[{"type":"text","text":"Continue"}]}}
+{"role":"assistant","message":{"content":[{"type":"text","text":"Task is <promise>COMPLETE</promise>"}]}}
+{"role":"assistant","message":{"content":[{"type":"tool_use","id":"abc","name":"Bash","input":{"command":"echo done"}}]}}
+{"role":"assistant","message":{"content":[{"type":"tool_result","tool_use_id":"abc","content":"done"}]}}
+EOF
+
+HOOK_INPUT=$(jq -n --arg sid "$SESSION" --arg tp "$TEST_DIR/transcript.jsonl" '{session_id: $sid, transcript_path: $tp, cwd: "."}')
+RESULT=$(echo "$HOOK_INPUT" | "$HOOK_SCRIPT" 2>&1) || true
+
+if [[ "$RESULT" != *'"decision": "block"'* ]]; then
+  pass "Promise found despite tool-only final message"
+else
+  fail "Should find promise when final message has no text" "Result: $RESULT"
+  exit 1
+fi
+
+# ============================================================================
+# JQ FILTER UNIT TESTS (would have caught format mismatch bug)
+# ============================================================================
+
+run_test "jq filter extracts text from correct transcript format"
+# This directly tests the jq filter logic that was buggy
+# Transcript format: {"role":"assistant", "message":{"content":[...]}}
+# NOT: {"message":{"role":"assistant", ...}}
+TEST_TRANSCRIPT=$(cat <<'EOF'
+{"role":"assistant","message":{"content":[{"type":"text","text":"Hello world"}]}}
+EOF
+)
+
+RESULT=$(echo "$TEST_TRANSCRIPT" | jq -rs '[.[] | select(.role == "assistant") | .message.content[]? | select(.type == "text") | .text] | join("\n")')
+
+if [[ "$RESULT" == "Hello world" ]]; then
+  pass "jq filter correctly extracts text from transcript format"
+else
+  fail "jq filter broken - got: '$RESULT'" ""
+  exit 1
+fi
+
+run_test "jq filter handles mixed content (text + tool_use)"
+TEST_TRANSCRIPT=$(cat <<'EOF'
+{"role":"assistant","message":{"content":[{"type":"text","text":"First"},{"type":"tool_use","id":"x","name":"Bash","input":{}},{"type":"text","text":"Second"}]}}
+EOF
+)
+
+RESULT=$(echo "$TEST_TRANSCRIPT" | jq -rs '[.[] | select(.role == "assistant") | .message.content[]? | select(.type == "text") | .text] | join("\n")')
+
+if [[ "$RESULT" == $'First\nSecond' ]]; then
+  pass "jq filter extracts all text blocks, skips tool_use"
+else
+  fail "jq filter failed with mixed content - got: '$RESULT'" ""
+  exit 1
+fi
+
+# ============================================================================
 # CORRUPTED STATE FILE TESTS
 # ============================================================================
 
@@ -678,6 +778,83 @@ if echo "$RESULT" | jq -e '.decision == "block"' > /dev/null 2>&1 && \
   pass "Block response is valid JSON with decision, reason, systemMessage"
 else
   fail "Block response should be valid JSON with required fields" "Result: $RESULT"
+  exit 1
+fi
+rm -f "$TEST_DIR/.claude/ralph-loop.${SESSION}.local.md"
+
+# ============================================================================
+# SESSION ID SECURITY VALIDATION TESTS
+# ============================================================================
+
+run_test "Session ID with path traversal (..) → allows exit (security)"
+SESSION_ATTACK="../../../etc/passwd"
+create_transcript
+
+HOOK_INPUT=$(jq -n --arg sid "$SESSION_ATTACK" --arg tp "$TEST_DIR/transcript.jsonl" '{session_id: $sid, transcript_path: $tp, cwd: "."}')
+RESULT=$(echo "$HOOK_INPUT" | "$HOOK_SCRIPT" 2>&1) || true
+
+# Should allow exit (security check rejects malicious session ID)
+if [[ "$RESULT" != *'"decision": "block"'* ]]; then
+  pass "Path traversal session ID rejected"
+else
+  fail "Should reject path traversal session ID" "Result: $RESULT"
+  exit 1
+fi
+
+run_test "Session ID with colons → allows exit (security)"
+SESSION_ATTACK="session:with:colons"
+create_transcript
+
+HOOK_INPUT=$(jq -n --arg sid "$SESSION_ATTACK" --arg tp "$TEST_DIR/transcript.jsonl" '{session_id: $sid, transcript_path: $tp, cwd: "."}')
+RESULT=$(echo "$HOOK_INPUT" | "$HOOK_SCRIPT" 2>&1) || true
+
+if [[ "$RESULT" != *'"decision": "block"'* ]]; then
+  pass "Session ID with colons rejected"
+else
+  fail "Should reject session ID with colons" "Result: $RESULT"
+  exit 1
+fi
+
+run_test "Session ID with slashes → allows exit (security)"
+SESSION_ATTACK="session/with/slashes"
+create_transcript
+
+HOOK_INPUT=$(jq -n --arg sid "$SESSION_ATTACK" --arg tp "$TEST_DIR/transcript.jsonl" '{session_id: $sid, transcript_path: $tp, cwd: "."}')
+RESULT=$(echo "$HOOK_INPUT" | "$HOOK_SCRIPT" 2>&1) || true
+
+if [[ "$RESULT" != *'"decision": "block"'* ]]; then
+  pass "Session ID with slashes rejected"
+else
+  fail "Should reject session ID with slashes" "Result: $RESULT"
+  exit 1
+fi
+
+run_test "Session ID with spaces → allows exit (security)"
+SESSION_ATTACK="session with spaces"
+create_transcript
+
+HOOK_INPUT=$(jq -n --arg sid "$SESSION_ATTACK" --arg tp "$TEST_DIR/transcript.jsonl" '{session_id: $sid, transcript_path: $tp, cwd: "."}')
+RESULT=$(echo "$HOOK_INPUT" | "$HOOK_SCRIPT" 2>&1) || true
+
+if [[ "$RESULT" != *'"decision": "block"'* ]]; then
+  pass "Session ID with spaces rejected"
+else
+  fail "Should reject session ID with spaces" "Result: $RESULT"
+  exit 1
+fi
+
+run_test "Valid session ID with dots and underscores → works normally"
+SESSION="valid.session_id-123"
+create_state_file "$SESSION" 3 10 "DONE"
+create_transcript
+
+HOOK_INPUT=$(jq -n --arg sid "$SESSION" --arg tp "$TEST_DIR/transcript.jsonl" '{session_id: $sid, transcript_path: $tp, cwd: "."}')
+RESULT=$(echo "$HOOK_INPUT" | "$HOOK_SCRIPT" 2>&1)
+
+if echo "$RESULT" | grep -q '"decision": "block"'; then
+  pass "Valid session ID with dots/underscores accepted"
+else
+  fail "Should accept valid session ID" "Result: $RESULT"
   exit 1
 fi
 rm -f "$TEST_DIR/.claude/ralph-loop.${SESSION}.local.md"

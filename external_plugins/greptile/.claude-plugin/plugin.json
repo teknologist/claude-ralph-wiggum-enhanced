@@ -1,7 +1,0 @@
-{
-  "name": "greptile",
-  "description": "AI-powered codebase search and understanding. Query your repositories using natural language to find relevant code, understand dependencies, and get contextual answers about your codebase architecture.",
-  "author": {
-    "name": "Greptile"
-  }
-}

@@ -4,134 +4,123 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Repository Overview
 
-This is the official Claude Code Plugins Directory - a curated collection of plugins that extend Claude Code's functionality. It contains both internal plugins developed by Anthropic and external third-party plugins.
+This repository contains the **Ralph Wiggum** plugin for Claude Code - a self-referential iteration loop system that enables autonomous, iterative task execution.
 
 ## Structure
 
 ```
-/plugins           # Internal plugins developed by Anthropic
-/external_plugins  # Third-party partner plugins
+/plugins/ralph-wiggum    # Main plugin directory
+/ralph-dashboard         # Web dashboard for monitoring loops
 ```
 
-## Plugin Architecture
+## Ralph Wiggum Plugin
 
-Each plugin follows a standard directory structure:
+Ralph Wiggum creates self-referential development loops where Claude's output is fed back as input, enabling iterative refinement until a task is complete.
+
+### Key Components
 
 ```
-plugin-name/
+plugins/ralph-wiggum/
 ├── .claude-plugin/
-│   └── plugin.json      # Required: Plugin manifest (must be here, not at root)
-├── commands/            # Slash commands (.md files)
-├── agents/              # Subagent definitions (.md files)
-├── skills/              # Skills (subdirectories with SKILL.md)
+│   └── plugin.json          # Plugin manifest
+├── commands/                 # Slash commands
+│   ├── ralph-loop.md        # Start a loop in current session
+│   ├── list-ralph-loops.md  # List active loops
+│   └── cancel-ralph.md      # Cancel active loop
 ├── hooks/
-│   └── hooks.json       # Event handler configuration
-├── .mcp.json            # MCP server definitions
-└── README.md
+│   ├── hooks.json           # Hook configuration
+│   ├── session-start-hook.sh # Persists session ID
+│   └── stop-hook.sh         # Intercepts exit, feeds prompt back
+├── scripts/
+│   ├── setup-ralph-loop.sh  # Creates state file for loop
+│   ├── list-ralph-loops.sh  # Lists active loops
+│   ├── cancel-ralph.sh      # Cancels loop
+│   └── log-session.sh       # Session history logging
+└── tests/                   # Comprehensive test suite
 ```
 
-**Critical rules:**
+### How It Works
+
+1. User runs `/ralph-loop <prompt> --completion-promise "DONE"`
+2. `setup-ralph-loop.sh` creates a session-specific state file
+3. Claude works on the task and tries to exit
+4. `stop-hook.sh` intercepts the exit, checks for completion promise
+5. If promise not found, feeds the same prompt back to continue
+6. Loop continues until promise detected or max iterations reached
+
+### Session Isolation
+
+Each Claude Code session gets its own loop via `CLAUDE_SESSION_ID`:
+- State files: `.claude/ralph-loop.{session_id}.local.md`
+- Multiple terminals can run different loops simultaneously
+- No cross-session interference
+
+### State File Format
+
+```yaml
+---
+active: true
+session_id: "abc123"
+description: "Build a REST API..."
+iteration: 5
+max_iterations: 50
+completion_promise: "TASK COMPLETE"
+started_at: "2024-01-15T10:30:00Z"
+---
+
+The actual prompt text goes here...
+```
+
+## Ralph Dashboard
+
+A web-based monitoring dashboard for Ralph Wiggum loops.
+
+### Tech Stack
+- **Backend**: Fastify + TypeScript
+- **Frontend**: React + Vite + TailwindCSS
+- **Testing**: Vitest (96%+ coverage)
+
+### Running the Dashboard
+
+```bash
+cd ralph-dashboard
+pnpm install
+pnpm dev        # Development mode
+pnpm build      # Production build
+pnpm test       # Run tests
+```
+
+## Development Guidelines
+
+### Testing
+
+All plugin scripts have comprehensive tests:
+
+```bash
+cd plugins/ralph-wiggum/tests
+./run-all-tests.sh
+```
+
+Test categories:
+- Session isolation tests
+- State file parsing tests
+- Promise detection tests
+- Security validation tests
+- Error handling tests
+
+### Security Considerations
+
+- Session IDs are validated to prevent path traversal
+- Only alphanumeric, dots, hyphens, and underscores allowed
+- Path traversal patterns (`..`) are rejected
+
+### Plugin Architecture Rules
+
+- Use `${CLAUDE_PLUGIN_ROOT}` for all internal path references
 - Manifest (`plugin.json`) MUST be in `.claude-plugin/` directory
-- Component directories (`commands/`, `agents/`, `skills/`, `hooks/`) MUST be at plugin root level
-- Use kebab-case for all file and directory names
-- Use `${CLAUDE_PLUGIN_ROOT}` for all internal path references (never hardcode paths)
+- Use kebab-case for file and directory names
 
 ## Environment Variables
 
-### `${CLAUDE_PLUGIN_ROOT}`
-**Automatically substituted** by Claude Code to the absolute path of the plugin directory. Use it everywhere:
-- Command markdown files (bash commands in instructions)
-- Hook configurations (`hooks.json`)
-- MCP server definitions (`.mcp.json`)
-- Any script references within the plugin
-
-Example: `${CLAUDE_PLUGIN_ROOT}/scripts/my-script.sh` resolves to `/Users/name/.claude/plugins/my-plugin/scripts/my-script.sh`
-
-**Important:** Plugins cannot reference files outside their directory - path traversal like `../shared-utils` won't work after installation.
-
-## Component Formats
-
-### Commands (`commands/*.md`)
-```yaml
----
-description: Short description for /help
-argument-hint: <required-arg> [optional-arg]
-allowed-tools: [Read, Glob, Grep, Bash]
----
-Command instructions...
-```
-
-### Skills (`skills/skill-name/SKILL.md`)
-```yaml
----
-name: skill-name
-description: When to use this skill (include trigger phrases)
-version: 1.0.0
----
-Skill guidance content...
-```
-
-### Agents (`agents/*.md`)
-```yaml
----
-description: Agent role and expertise
-capabilities:
-  - Specific task 1
----
-Agent instructions...
-```
-
-### Hooks (`hooks/hooks.json`)
-```json
-{
-  "PreToolUse": [{
-    "matcher": "Write|Edit",
-    "hooks": [{
-      "type": "command",
-      "command": "bash ${CLAUDE_PLUGIN_ROOT}/hooks/scripts/validate.sh"
-    }]
-  }]
-}
-```
-Available events: PreToolUse, PostToolUse, Stop, SubagentStop, SessionStart, SessionEnd, UserPromptSubmit, PreCompact, Notification
-
-### MCP Servers (`.mcp.json`)
-```json
-{
-  "server-name": {
-    "command": "node",
-    "args": ["${CLAUDE_PLUGIN_ROOT}/servers/server.js"],
-    "env": { "API_KEY": "${API_KEY}" }
-  }
-}
-```
-
-## Key Plugins to Reference
-
-- **`plugins/example-plugin/`** - Reference implementation showing all component types
-- **`plugins/plugin-dev/`** - Comprehensive toolkit with 7 skills for plugin development
-- **`plugins/hookify/`** - Pattern-based hook creation via markdown config files
-- **`plugins/ralph-wiggum/`** - Self-referential iteration loops using Stop hooks
-
-## Validation
-
-Use the plugin-dev toolkit's utility scripts:
-```bash
-./validate-hook-schema.sh hooks/hooks.json
-./validate-agent.sh agents/my-agent.md
-./test-hook.sh my-hook.sh test-input.json
-```
-
-## Testing Plugins Locally
-
-```bash
-cc --plugin-dir /path/to/plugin-name
-```
-
-## Installation From Marketplace
-
-```bash
-/plugin install {plugin-name}@claude-plugin-directory
-```
-
-Or browse in `/plugin > Discover`
+- `CLAUDE_SESSION_ID` - Set by session-start hook, identifies current session
+- `CLAUDE_ENV_FILE` - Path to environment file for session persistence

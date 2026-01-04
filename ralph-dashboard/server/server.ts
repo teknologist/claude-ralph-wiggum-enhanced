@@ -11,6 +11,34 @@ interface ServerOptions {
 
 const DIST_DIR = join(import.meta.dir, '..', 'dist');
 
+/**
+ * Validate session ID to prevent path traversal and injection attacks.
+ * Matches the validation logic in the bash hooks for consistency.
+ * Allows UUIDs, alphanumeric with hyphens/underscores/dots (but not .. for path traversal).
+ */
+function validateSessionId(sessionId: string): boolean {
+  // Allow UUIDs, alphanumeric with hyphens/underscores/dots
+  const validPattern = /^[a-zA-Z0-9._-]+$/;
+  // Explicitly reject path traversal attempts
+  const noPathTraversal = !sessionId.includes('..');
+
+  return validPattern.test(sessionId) && noPathTraversal;
+}
+
+/**
+ * Create a standardized error response for invalid session IDs.
+ */
+function invalidSessionIdResponse(): Response {
+  return Response.json(
+    {
+      error: 'INVALID_SESSION_ID',
+      message:
+        'Invalid session ID format. Session ID must contain only alphanumeric characters, hyphens, underscores, and dots.',
+    },
+    { status: 400 }
+  );
+}
+
 function getMimeType(path: string): string {
   const ext = path.split('.').pop()?.toLowerCase();
   const mimeTypes: Record<string, string> = {
@@ -57,16 +85,25 @@ export function createServer(options: ServerOptions) {
 
       // API routes
       if (path.startsWith('/api/')) {
-        // CORS headers for API
-        const corsHeaders = {
+        // Security headers for API
+        const securityHeaders = {
+          // CORS
           'Access-Control-Allow-Origin': '*',
           'Access-Control-Allow-Methods': 'GET, POST, DELETE, OPTIONS',
           'Access-Control-Allow-Headers': 'Content-Type',
+          // Security headers
+          'Content-Security-Policy':
+            "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline';",
+          'X-Content-Type-Options': 'nosniff',
+          'X-Frame-Options': 'DENY',
+          'X-XSS-Protection': '1; mode=block',
+          'Referrer-Policy': 'strict-origin-when-cross-origin',
+          'Strict-Transport-Security': 'max-age=31536000; includeSubDomains',
         };
 
         // Handle preflight
         if (req.method === 'OPTIONS') {
-          return new Response(null, { headers: corsHeaders });
+          return new Response(null, { headers: securityHeaders });
         }
 
         let response: Response;
@@ -81,7 +118,11 @@ export function createServer(options: ServerOptions) {
           req.method === 'GET'
         ) {
           const sessionId = path.split('/').pop()!;
-          response = handleGetSession(sessionId);
+          if (!validateSessionId(sessionId)) {
+            response = invalidSessionIdResponse();
+          } else {
+            response = handleGetSession(sessionId);
+          }
         }
         // POST /api/sessions/:id/cancel
         else if (
@@ -90,7 +131,11 @@ export function createServer(options: ServerOptions) {
         ) {
           const parts = path.split('/');
           const sessionId = parts[parts.length - 2];
-          response = handleCancelSession(sessionId);
+          if (!validateSessionId(sessionId)) {
+            response = invalidSessionIdResponse();
+          } else {
+            response = handleCancelSession(sessionId);
+          }
         }
         // DELETE /api/sessions/:id
         else if (
@@ -98,7 +143,11 @@ export function createServer(options: ServerOptions) {
           req.method === 'DELETE'
         ) {
           const sessionId = path.split('/').pop()!;
-          response = handleDeleteSession(sessionId);
+          if (!validateSessionId(sessionId)) {
+            response = invalidSessionIdResponse();
+          } else {
+            response = handleDeleteSession(sessionId);
+          }
         }
         // 404 for unknown API routes
         else {
@@ -108,9 +157,9 @@ export function createServer(options: ServerOptions) {
           );
         }
 
-        // Add CORS headers to response
+        // Add security headers to response
         const headers = new Headers(response.headers);
-        Object.entries(corsHeaders).forEach(([key, value]) => {
+        Object.entries(securityHeaders).forEach(([key, value]) => {
           headers.set(key, value);
         });
 

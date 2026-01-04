@@ -446,21 +446,14 @@ fi
 # --help OPTION TEST
 # ============================================================================
 
-run_test "--help shows usage information"
-HELP_OUTPUT=$("$SETUP_SCRIPT" --help 2>&1 || true)
-if echo "$HELP_OUTPUT" | grep -qi "usage\|ralph\|options\|--max-iterations"; then
-  pass "--help shows usage information"
+run_test "--help and -h both show usage information"
+HELP_LONG=$("$SETUP_SCRIPT" --help 2>&1 || true)
+HELP_SHORT=$("$SETUP_SCRIPT" -h 2>&1 || true)
+if echo "$HELP_LONG" | grep -qi "usage\|ralph\|options\|--max-iterations" && \
+   echo "$HELP_SHORT" | grep -qi "usage\|ralph\|options"; then
+  pass "Both --help and -h show usage information"
 else
-  fail "--help should show usage" "Output: $HELP_OUTPUT"
-  exit 1
-fi
-
-run_test "-h shows usage information"
-HELP_OUTPUT=$("$SETUP_SCRIPT" -h 2>&1 || true)
-if echo "$HELP_OUTPUT" | grep -qi "usage\|ralph\|options"; then
-  pass "-h shows usage information"
-else
-  fail "-h should show usage" "Output: $HELP_OUTPUT"
+  fail "--help or -h missing usage info" "Long: $HELP_LONG | Short: $HELP_SHORT"
   exit 1
 fi
 
@@ -580,6 +573,38 @@ if grep -q 'Build a REST API for users' "$STATE_FILE"; then
 else
   fail "Multiple word prompt not captured"
   cat "$STATE_FILE"
+  exit 1
+fi
+rm -f "$STATE_FILE"
+
+# ============================================================================
+# ARGUMENT FALLBACK TESTS (would have caught word-splitting bug)
+# ============================================================================
+
+run_test "--max-iterations=VALUE format (equals sign syntax)"
+export CLAUDE_SESSION_ID="test-equals-syntax"
+"$SETUP_SCRIPT" "Test task" --max-iterations=25 > /dev/null
+
+STATE_FILE=".claude/ralph-loop.${CLAUDE_SESSION_ID}.local.md"
+if grep -q 'max_iterations: 25' "$STATE_FILE"; then
+  pass "--max-iterations=VALUE format works"
+else
+  fail "--max-iterations=VALUE format not handled"
+  grep 'max_iterations' "$STATE_FILE" || echo "Field not found"
+  exit 1
+fi
+rm -f "$STATE_FILE"
+
+run_test "--completion-promise=VALUE format (equals sign syntax)"
+export CLAUDE_SESSION_ID="test-promise-equals"
+"$SETUP_SCRIPT" "Test task" --completion-promise=DONE > /dev/null
+
+STATE_FILE=".claude/ralph-loop.${CLAUDE_SESSION_ID}.local.md"
+if grep -q 'completion_promise: "DONE"' "$STATE_FILE"; then
+  pass "--completion-promise=VALUE format works"
+else
+  fail "--completion-promise=VALUE format not handled"
+  grep 'completion_promise' "$STATE_FILE" || echo "Field not found"
   exit 1
 fi
 rm -f "$STATE_FILE"

@@ -28,6 +28,14 @@ if [[ -z "$CURRENT_SESSION_ID" ]]; then
   exit 0
 fi
 
+# Validate session ID format to prevent path traversal attacks
+# Allow UUIDs, alphanumeric with hyphens/underscores/dots (but not .. for path traversal)
+if [[ ! "$CURRENT_SESSION_ID" =~ ^[a-zA-Z0-9._-]+$ ]] || [[ "$CURRENT_SESSION_ID" == *".."* ]]; then
+  echo "⚠️  Ralph loop: Invalid session ID format (security check)" >&2
+  echo "   Session ID contains unsafe characters: $CURRENT_SESSION_ID" >&2
+  exit 0
+fi
+
 # Check if ralph-loop is active for THIS session
 RALPH_STATE_FILE=".claude/ralph-loop.${CURRENT_SESSION_ID}.local.md"
 
@@ -42,6 +50,11 @@ ITERATION=$(echo "$FRONTMATTER" | grep '^iteration:' | sed 's/iteration: *//')
 MAX_ITERATIONS=$(echo "$FRONTMATTER" | grep '^max_iterations:' | sed 's/max_iterations: *//')
 # Extract completion_promise and strip surrounding quotes if present
 COMPLETION_PROMISE=$(echo "$FRONTMATTER" | grep '^completion_promise:' | sed 's/completion_promise: *//' | sed 's/^"\(.*\)"$/\1/')
+# Strip any remaining literal quotes (handles edge cases from $ARGUMENTS expansion)
+COMPLETION_PROMISE="${COMPLETION_PROMISE#\"}"
+COMPLETION_PROMISE="${COMPLETION_PROMISE%\"}"
+COMPLETION_PROMISE="${COMPLETION_PROMISE#\'}"
+COMPLETION_PROMISE="${COMPLETION_PROMISE%\'}"
 
 # Validate numeric fields before arithmetic operations
 if [[ ! "$ITERATION" =~ ^[0-9]+$ ]]; then
@@ -140,10 +153,24 @@ fi
 
 # Check for completion promise (only if set)
 if [[ "$COMPLETION_PROMISE" != "null" ]] && [[ -n "$COMPLETION_PROMISE" ]]; then
+  # IMPORTANT: Check ALL assistant messages, not just the last one
+  # This handles cases where Claude outputs the promise but then the final message
+  # is a tool call with no text content
+  # Using jq -s (slurp) to efficiently process all JSONL lines in one pass
+  # Note: Transcript format is {"role":"assistant", "message":{"content":[...]}}
+  # Role is at top level, content is inside message
+  ALL_ASSISTANT_TEXT=$(jq -rs '
+    [.[] | select(.role == "assistant") | .message.content[]? | select(.type == "text") | .text] | join("\n")
+  ' "$TRANSCRIPT_PATH" 2>/dev/null || echo "")
+
   # Extract text from <promise> tags using Perl for multiline support
   # -0777 slurps entire input, s flag makes . match newlines
   # .*? is non-greedy (takes FIRST tag), whitespace normalized
-  PROMISE_TEXT=$(echo "$LAST_OUTPUT" | perl -0777 -pe 's/.*?<promise>(.*?)<\/promise>.*/$1/s; s/^\s+|\s+$//g; s/\s+/ /g' 2>/dev/null || echo "")
+  PROMISE_TEXT=$(echo "$ALL_ASSISTANT_TEXT" | perl -0777 -pe 's/.*?<promise>(.*?)<\/promise>.*/$1/s; s/^\s+|\s+$//g; s/\s+/ /g' 2>/dev/null || echo "")
+
+  # Strip quotes from extracted promise text (for consistency with COMPLETION_PROMISE)
+  PROMISE_TEXT="${PROMISE_TEXT//\"/}"
+  PROMISE_TEXT="${PROMISE_TEXT//\'/}"
 
   # Use = for literal string comparison (not pattern matching)
   # == in [[ ]] does glob pattern matching which breaks with *, ?, [ characters

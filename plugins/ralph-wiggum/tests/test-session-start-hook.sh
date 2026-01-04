@@ -265,16 +265,31 @@ else
   exit 1
 fi
 
-run_test "Session ID with colons (time-like)"
+run_test "Session ID with colons rejected (security)"
 ENV_FILE="$TEST_DIR/claude-env-colons"
 touch "$ENV_FILE"
 export CLAUDE_ENV_FILE="$ENV_FILE"
-echo '{"session_id": "session:10:30:45", "cwd": "/tmp"}' | "$HOOK_SCRIPT"
+echo '{"session_id": "session:10:30:45", "cwd": "/tmp"}' | "$HOOK_SCRIPT" || true
 
-if grep -q 'session:10:30:45' "$ENV_FILE"; then
-  pass "Colons in session ID handled"
+# Colons should be rejected for security/portability (not valid in filenames on Windows)
+if [[ ! -s "$ENV_FILE" ]]; then
+  pass "Colons in session ID correctly rejected"
 else
-  fail "Colons in session ID not handled" ""
+  fail "Colons in session ID should be rejected for security" ""
+  exit 1
+fi
+
+run_test "Session ID with path traversal (..) rejected (security)"
+ENV_FILE="$TEST_DIR/claude-env-pathtraversal"
+touch "$ENV_FILE"
+export CLAUDE_ENV_FILE="$ENV_FILE"
+echo '{"session_id": "../../../etc/passwd", "cwd": "/tmp"}' | "$HOOK_SCRIPT" || true
+
+# Path traversal attempts should be rejected
+if [[ ! -s "$ENV_FILE" ]]; then
+  pass "Path traversal session ID correctly rejected"
+else
+  fail "Path traversal session ID should be rejected for security" ""
   exit 1
 fi
 
