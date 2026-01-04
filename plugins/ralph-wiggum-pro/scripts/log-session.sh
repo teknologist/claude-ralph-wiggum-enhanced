@@ -146,9 +146,10 @@ else
   STATE_FILE="${1:-}"
   OUTCOME="${2:-}"
   ERROR_REASON="${3:-}"
+  DELETE_STATE_FILE="${4:-}"
 
   if [[ -z "$STATE_FILE" ]] || [[ -z "$OUTCOME" ]]; then
-    echo "Usage: log-session.sh <state_file> <outcome> [error_reason]" >&2
+    echo "Usage: log-session.sh <state_file> <outcome> [error_reason] [--delete]" >&2
     echo "   or: log-session.sh --start --session-id ID --project PATH --task TEXT --state-file PATH" >&2
     exit 1
   fi
@@ -225,4 +226,14 @@ else
   cat "$TEMP_ENTRY" >> "$LOG_FILE"
 
   echo "📝 Session completed - logged to $LOG_FILE"
+
+  # Delete state file if --delete flag is passed
+  if [[ "$DELETE_STATE_FILE" == "--delete" ]]; then
+    rm -f "$STATE_FILE"
+    if [[ ! -f "$STATE_FILE" ]]; then
+      echo "🗑️  State file deleted: $STATE_FILE"
+    else
+      echo "⚠️  Warning: State file may not have been deleted: $STATE_FILE" >&2
+    fi
+  fi
 fi

@@ -55,8 +55,7 @@ Say: "No active Ralph loops found in this project."
    }
    ```
 3. If confirmed:
-   a. Log the cancellation: `${CLAUDE_PLUGIN_ROOT}/scripts/log-session.sh "<FILE>" "cancelled"`
-   b. Delete the state file: `rm "<FILE>"`
+   - Log and delete atomically: `${CLAUDE_PLUGIN_ROOT}/scripts/log-session.sh "<FILE>" "cancelled" "" --delete`
 4. Report: "Cancelled Ralph loop: <description> (was at iteration <ITER>)"
 5. If not confirmed, say: "Loop not cancelled."
 
@@ -69,8 +68,7 @@ Say: "No active Ralph loops found in this project."
    - Use multiSelect: true to allow canceling multiple loops
 3. If user selects "None", say: "No loops cancelled."
 4. Otherwise, for each selected loop:
-   a. Log the cancellation: `${CLAUDE_PLUGIN_ROOT}/scripts/log-session.sh "<FILE>" "cancelled"`
-   b. Delete the state file: `rm "<FILE>"`
+   - Log and delete atomically: `${CLAUDE_PLUGIN_ROOT}/scripts/log-session.sh "<FILE>" "cancelled" "" --delete`
 5. Report which loops were cancelled
 
 Example AskUserQuestion format for multiple loops:

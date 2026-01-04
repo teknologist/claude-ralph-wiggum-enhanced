@@ -33,6 +33,30 @@ export function SessionDetail({
   return (
     <div className="bg-gray-50 p-4 border-t border-gray-200">
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {/* Loop ID */}
+        <div>
+          <label className="text-sm font-medium text-gray-500">Loop ID</label>
+          <p
+            className="mt-1 text-claude-dark font-mono text-sm truncate"
+            title={session.loop_id}
+          >
+            {session.loop_id}
+          </p>
+        </div>
+
+        {/* Session ID */}
+        <div>
+          <label className="text-sm font-medium text-gray-500">
+            Session ID
+          </label>
+          <p
+            className="mt-1 text-claude-dark font-mono text-sm truncate"
+            title={session.session_id}
+          >
+            {session.session_id}
+          </p>
+        </div>
+
         {/* Task */}
         <div className="md:col-span-2">
           <label className="text-sm font-medium text-gray-500">Task</label>

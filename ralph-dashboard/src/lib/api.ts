@@ -17,8 +17,8 @@ export async function fetchSessions(): Promise<SessionsResponse> {
   return response.json();
 }
 
-export async function fetchSession(sessionId: string): Promise<Session> {
-  const response = await fetch(`${API_BASE}/sessions/${sessionId}`);
+export async function fetchSession(loopId: string): Promise<Session> {
+  const response = await fetch(`${API_BASE}/sessions/${loopId}`);
   if (!response.ok) {
     const error: ErrorResponse = await response.json();
     throw new Error(error.message);
@@ -26,10 +26,8 @@ export async function fetchSession(sessionId: string): Promise<Session> {
   return response.json();
 }
 
-export async function cancelSession(
-  sessionId: string
-): Promise<CancelResponse> {
-  const response = await fetch(`${API_BASE}/sessions/${sessionId}/cancel`, {
+export async function cancelSession(loopId: string): Promise<CancelResponse> {
+  const response = await fetch(`${API_BASE}/sessions/${loopId}/cancel`, {
     method: 'POST',
   });
   if (!response.ok) {
@@ -39,10 +37,8 @@ export async function cancelSession(
   return response.json();
 }
 
-export async function deleteSession(
-  sessionId: string
-): Promise<DeleteResponse> {
-  const response = await fetch(`${API_BASE}/sessions/${sessionId}`, {
+export async function deleteSession(loopId: string): Promise<DeleteResponse> {
+  const response = await fetch(`${API_BASE}/sessions/${loopId}`, {
     method: 'DELETE',
   });
   if (!response.ok) {

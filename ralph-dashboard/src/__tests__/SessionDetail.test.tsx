@@ -116,6 +116,51 @@ describe('SessionDetail', () => {
       );
       expect(screen.getByText('0 / 10')).toBeInTheDocument();
     });
+
+    it('renders loop_id', () => {
+      render(
+        <SessionDetail
+          session={createMockSession({ loop_id: 'abc-123-def-456' })}
+          onCancel={mockOnCancel}
+          isCancelling={false}
+        />
+      );
+      expect(screen.getByText('abc-123-def-456')).toBeInTheDocument();
+      expect(screen.getByText('Loop ID')).toBeInTheDocument();
+    });
+
+    it('renders session_id', () => {
+      render(
+        <SessionDetail
+          session={createMockSession({ session_id: 'session-xyz-789' })}
+          onCancel={mockOnCancel}
+          isCancelling={false}
+        />
+      );
+      expect(screen.getByText('session-xyz-789')).toBeInTheDocument();
+      expect(screen.getByText('Session ID')).toBeInTheDocument();
+    });
+
+    it('displays loop_id and session_id with title attribute for tooltip', () => {
+      const { container } = render(
+        <SessionDetail
+          session={createMockSession({
+            loop_id: 'full-loop-uuid-here',
+            session_id: 'full-session-uuid-here',
+          })}
+          onCancel={mockOnCancel}
+          isCancelling={false}
+        />
+      );
+      const loopIdElement = container.querySelector(
+        '[title="full-loop-uuid-here"]'
+      );
+      const sessionIdElement = container.querySelector(
+        '[title="full-session-uuid-here"]'
+      );
+      expect(loopIdElement).toBeInTheDocument();
+      expect(sessionIdElement).toBeInTheDocument();
+    });
   });
 
   describe('duration formatting', () => {

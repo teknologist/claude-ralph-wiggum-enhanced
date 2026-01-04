@@ -224,9 +224,7 @@ describe('SessionRow', () => {
     });
 
     it('calls mutate when confirming cancel', async () => {
-      renderRow(
-        createMockSession({ session_id: 'session-123', status: 'active' })
-      );
+      renderRow(createMockSession({ loop_id: 'loop-123', status: 'active' }));
 
       // Expand and click cancel
       const row = screen.getByText('test-project').closest('tr');
@@ -246,21 +244,16 @@ describe('SessionRow', () => {
       );
       fireEvent.click(confirmButton!);
 
-      expect(mockMutate).toHaveBeenCalledWith(
-        'session-123',
-        expect.any(Object)
-      );
+      expect(mockMutate).toHaveBeenCalledWith('loop-123', expect.any(Object));
     });
 
     it('closes modal and row on successful cancel', async () => {
       // Mock mutate to call onSuccess
-      mockMutate.mockImplementation((_sessionId, options) => {
+      mockMutate.mockImplementation((_loopId, options) => {
         options?.onSuccess?.();
       });
 
-      renderRow(
-        createMockSession({ session_id: 'session-123', status: 'active' })
-      );
+      renderRow(createMockSession({ loop_id: 'loop-123', status: 'active' }));
 
       // Expand and click cancel
       const row = screen.getByText('test-project').closest('tr');
@@ -294,13 +287,11 @@ describe('SessionRow', () => {
       const alertSpy = vi.spyOn(window, 'alert').mockImplementation(() => {});
 
       // Mock mutate to call onError
-      mockMutate.mockImplementation((_sessionId, options) => {
+      mockMutate.mockImplementation((_loopId, options) => {
         options?.onError?.(new Error('Cancel failed'));
       });
 
-      renderRow(
-        createMockSession({ session_id: 'session-123', status: 'active' })
-      );
+      renderRow(createMockSession({ loop_id: 'loop-123', status: 'active' }));
 
       // Expand and click cancel
       const row = screen.getByText('test-project').closest('tr');

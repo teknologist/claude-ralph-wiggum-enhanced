@@ -77,7 +77,7 @@ export function SessionRow({ session }: SessionRowProps) {
   };
 
   const confirmCancel = () => {
-    cancelMutation.mutate(session.session_id, {
+    cancelMutation.mutate(session.loop_id, {
       onSuccess: () => {
         setShowCancelModal(false);
         setIsExpanded(false);
@@ -93,7 +93,7 @@ export function SessionRow({ session }: SessionRowProps) {
   };
 
   const confirmDelete = () => {
-    deleteMutation.mutate(session.session_id, {
+    deleteMutation.mutate(session.loop_id, {
       onSuccess: () => {
         setShowDeleteModal(false);
         setIsExpanded(false);
