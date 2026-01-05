@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.0.19] - 2026-01-05
+
+### Removed
+- **Near-miss detection**: Removed misleading "ALMOST! You forgot the `<promise>` tags!" message from stop-hook - XML tags were being detected correctly but not displayed, making this warning inaccurate
+
 ## [2.0.18] - 2026-01-05
 
 ### Added

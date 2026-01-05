@@ -258,17 +258,6 @@ if [[ "$COMPLETION_PROMISE" != "null" ]] && [[ -n "$COMPLETION_PROMISE" ]]; then
   fi
 fi
 
-# Near-miss detection: Check if Claude output the phrase without XML tags
-# This helps catch cases where Claude "forgets" the tag format
-NEAR_MISS=false
-if [[ "$COMPLETION_PROMISE" != "null" ]] && [[ -n "$COMPLETION_PROMISE" ]]; then
-  # Check if the bare phrase appears in the text (case-insensitive)
-  # Use ALL_ASSISTANT_TEXT which was already extracted above
-  if [[ -n "${ALL_ASSISTANT_TEXT:-}" ]] && echo "$ALL_ASSISTANT_TEXT" | grep -qiF "$COMPLETION_PROMISE"; then
-    NEAR_MISS=true
-  fi
-fi
-
 # Not complete - continue loop with SAME PROMPT
 NEXT_ITERATION=$((ITERATION + 1))
 
@@ -319,14 +308,7 @@ sed "s/^iteration: .*/iteration: $NEXT_ITERATION/" "$RALPH_STATE_FILE" > "$TEMP_
 mv "$TEMP_FILE" "$RALPH_STATE_FILE"
 
 # Build system message with iteration count, elapsed time, and completion promise info
-# Use special message for near-misses to help Claude correct the format
-if [[ "$NEAR_MISS" == "true" ]]; then
-  SYSTEM_MSG="⚠️ ALMOST! You output \"$COMPLETION_PROMISE\" but forgot the <promise> tags!
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-🔄 Ralph iteration $NEXT_ITERATION | Running for $ELAPSED_STR
-✅ TO COMPLETE: <promise>$COMPLETION_PROMISE</promise>
-📝 The XML tags are REQUIRED for detection - please try again!"
-elif [[ "$COMPLETION_PROMISE" != "null" ]] && [[ -n "$COMPLETION_PROMISE" ]]; then
+if [[ "$COMPLETION_PROMISE" != "null" ]] && [[ -n "$COMPLETION_PROMISE" ]]; then
   SYSTEM_MSG="🔄 Ralph iteration $NEXT_ITERATION | Running for $ELAPSED_STR
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 ⚠️  TO COMPLETE: <promise>$COMPLETION_PROMISE</promise>
@@ -337,7 +319,7 @@ fi
 
 # Output JSON to block the stop and feed prompt back
 # The "reason" field contains the prompt that will be sent back to Claude
-debug_log "BLOCKING: iteration=$NEXT_ITERATION near_miss=$NEAR_MISS"
+debug_log "BLOCKING: iteration=$NEXT_ITERATION"
 jq -n \
   --arg prompt "$PROMPT_TEXT" \
   --arg msg "$SYSTEM_MSG" \
