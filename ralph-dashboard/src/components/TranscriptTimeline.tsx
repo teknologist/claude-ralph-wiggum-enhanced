@@ -196,88 +196,82 @@ export function TranscriptTimeline({ session }: TranscriptTimelineProps) {
             </div>
           )}
 
-          {/* No Data State */}
-          {!isLoading && !error && iterations.length === 0 && (
-            <div className="text-gray-500 text-sm py-4 flex items-center gap-2">
-              <span>📭</span>
-              <span>No transcript available (recorded from v2.1.0+)</span>
-            </div>
-          )}
-
-          {/* Timeline Content */}
-          {!isLoading && !error && iterations.length > 0 && (
+          {/* Timeline Content - always shown when not loading/error */}
+          {!isLoading && !error && (
             <div className="space-y-4">
-              {/* Toolbar */}
-              <div className="flex flex-col sm:flex-row gap-2 sm:items-center sm:justify-between bg-gray-50 rounded-lg p-2 -ml-4 border-l-0">
-                {/* Search */}
-                <div className="relative flex-1 max-w-xs">
-                  <input
-                    type="text"
-                    placeholder="Search iterations..."
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    className="w-full pl-8 pr-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-claude-coral/50 focus:border-claude-coral"
-                    aria-label="Search iterations"
-                  />
-                  <svg
-                    className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+              {/* Toolbar - only shown when there are iterations */}
+              {iterations.length > 0 && (
+                <div className="flex flex-col sm:flex-row gap-2 sm:items-center sm:justify-between bg-gray-50 rounded-lg p-2 -ml-4 border-l-0">
+                  {/* Search */}
+                  <div className="relative flex-1 max-w-xs">
+                    <input
+                      type="text"
+                      placeholder="Search iterations..."
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                      className="w-full pl-8 pr-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-claude-coral/50 focus:border-claude-coral"
+                      aria-label="Search iterations"
                     />
-                  </svg>
-                  {searchTerm && (
-                    <button
-                      onClick={() => setSearchTerm('')}
-                      className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                      aria-label="Clear search"
+                    <svg
+                      className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
                     >
-                      <svg
-                        className="w-4 h-4"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+                      />
+                    </svg>
+                    {searchTerm && (
+                      <button
+                        onClick={() => setSearchTerm('')}
+                        className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                        aria-label="Clear search"
                       >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M6 18L18 6M6 6l12 12"
-                        />
-                      </svg>
+                        <svg
+                          className="w-4 h-4"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M6 18L18 6M6 6l12 12"
+                          />
+                        </svg>
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Actions */}
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => setShowFullTranscript(true)}
+                      className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-gray-600 hover:text-claude-coral hover:bg-white rounded-lg transition-colors"
+                      title="View full transcript"
+                    >
+                      <span>📜</span>
+                      <span className="hidden sm:inline">View Full</span>
                     </button>
-                  )}
+                    <button
+                      onClick={handleExport}
+                      className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-gray-600 hover:text-claude-coral hover:bg-white rounded-lg transition-colors"
+                      title="Export as Markdown"
+                    >
+                      <span>📥</span>
+                      <span className="hidden sm:inline">Export</span>
+                    </button>
+                  </div>
                 </div>
+              )}
 
-                {/* Actions */}
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => setShowFullTranscript(true)}
-                    className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-gray-600 hover:text-claude-coral hover:bg-white rounded-lg transition-colors"
-                    title="View full transcript"
-                  >
-                    <span>📜</span>
-                    <span className="hidden sm:inline">View Full</span>
-                  </button>
-                  <button
-                    onClick={handleExport}
-                    className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-gray-600 hover:text-claude-coral hover:bg-white rounded-lg transition-colors"
-                    title="Export as Markdown"
-                  >
-                    <span>📥</span>
-                    <span className="hidden sm:inline">Export</span>
-                  </button>
-                </div>
-              </div>
-
-              {/* Search Results Count */}
-              {searchTerm && (
+              {/* Search Results Count - only shown when there are iterations */}
+              {iterations.length > 0 && searchTerm && (
                 <div className="text-xs text-gray-500">
                   Found {filteredIterations.length} of {iterations.length}{' '}
                   iterations

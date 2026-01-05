@@ -67,6 +67,10 @@ export async function fetchTranscriptIterations(
   loopId: string
 ): Promise<IterationsResponse> {
   const response = await fetch(`${API_BASE}/transcript/${loopId}/iterations`);
+  // 404 means no iterations yet - return empty array instead of throwing
+  if (response.status === 404) {
+    return { iterations: [] };
+  }
   if (!response.ok) {
     const error: ErrorResponse = await response.json();
     throw new Error(error.message);
@@ -78,6 +82,10 @@ export async function fetchFullTranscript(
   loopId: string
 ): Promise<FullTranscriptResponse> {
   const response = await fetch(`${API_BASE}/transcript/${loopId}/full`);
+  // 404 means no transcript yet - return empty array instead of throwing
+  if (response.status === 404) {
+    return { messages: [] };
+  }
   if (!response.ok) {
     const error: ErrorResponse = await response.json();
     throw new Error(error.message);
