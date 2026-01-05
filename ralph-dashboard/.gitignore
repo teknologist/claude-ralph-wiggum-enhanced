@@ -1,6 +1,7 @@
 node_modules/
 bun.lock
 coverage/
+test-report.junit.xml
 *.log
 .DS_Store
 dist/
