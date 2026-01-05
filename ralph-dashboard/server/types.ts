@@ -48,6 +48,9 @@ export interface Session {
   max_iterations: number;
   completion_promise: string | null;
   error_reason: string | null;
+  // Checklist fields (optional)
+  has_checklist: boolean;
+  checklist_progress: string | null; // e.g. "3/5 tasks • 1/2 criteria"
 }
 
 export interface SessionsResponse {
@@ -102,4 +105,41 @@ export interface FullTranscriptResponse {
 export interface TranscriptAvailabilityResponse {
   hasIterations: boolean;
   hasFullTranscript: boolean;
+}
+
+// Checklist types
+export type ChecklistItemStatus = 'pending' | 'in_progress' | 'completed';
+
+export interface ChecklistItem {
+  id: string;
+  text: string;
+  status: ChecklistItemStatus;
+  created_at: string;
+  completed_at?: string | null;
+  completed_iteration?: number | null;
+}
+
+export interface Checklist {
+  loop_id: string;
+  session_id: string;
+  project: string;
+  project_name: string;
+  created_at: string;
+  updated_at: string;
+  task_checklist: ChecklistItem[];
+  completion_criteria: ChecklistItem[];
+}
+
+export interface ChecklistProgress {
+  tasks: string;
+  criteria: string;
+  tasksCompleted: number;
+  tasksTotal: number;
+  criteriaCompleted: number;
+  criteriaTotal: number;
+}
+
+export interface ChecklistResponse {
+  checklist: Checklist | null;
+  progress: ChecklistProgress | null;
 }

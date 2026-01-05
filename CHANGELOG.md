@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.1.1] - 2026-01-05
+
+### Added
+- **Checklist Progress in Stats**: `ralph-stats` command now displays checklist progress in a new column (format: "X/Y tasks • A/B criteria")
+- **Checklist in Iteration Messages**: Stop-hook now shows checklist summary in each iteration's system message
+
+### Changed
+- **Stats Table Layout**: Removed duration column from `ralph-stats` output to make room for checklist progress column
+- **Task Column Width**: Reduced task display width from 30 to 22 characters in `ralph-stats` to accommodate new checklist column
+- **Loop ID Validation**: Simplified validation in stop-hook from aggressive regex to basic sanity check (loop_id is internally generated, not user input)
+- **E2E Test Organization**: Moved e2e tests from `ralph-dashboard/e2e/` to `ralph-dashboard/tests/e2e/` for better organization
+
 ## [2.1.0] - 2026-01-05
 
 ### Added

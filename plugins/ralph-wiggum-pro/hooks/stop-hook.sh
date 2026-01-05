@@ -29,20 +29,15 @@ log_session() {
 # Transcript directory for storing iteration logs and full transcripts
 TRANSCRIPT_DIR="$HOME/.claude/ralph-wiggum-pro-logs/transcripts"
 
-# Validate loop_id format (alphanumeric, dots, dashes, underscores only - prevents path traversal)
-validate_loop_id() {
+# Basic sanity check for loop_id (only checks for obvious issues)
+# loop_id is internally generated, not user input, so we don't need aggressive validation
+sanity_check_loop_id() {
   local loop_id="$1"
-  # Only allow safe characters: letters, numbers, dots, dashes, underscores
-  # Max length of 256 characters to prevent abuse
+  # Just check for empty and obvious path traversal
   if [[ -z "$loop_id" ]]; then
     debug_log "ERROR: loop_id is empty"
     return 1
   fi
-  if [[ ! "$loop_id" =~ ^[a-zA-Z0-9._-]{1,256}$ ]]; then
-    debug_log "ERROR: Invalid loop_id format (contains unsafe characters or too long): $loop_id"
-    return 1
-  fi
-  # Prevent path traversal with ..
   if [[ "$loop_id" == *".."* ]]; then
     debug_log "ERROR: loop_id contains path traversal sequence: $loop_id"
     return 1
@@ -56,13 +51,12 @@ log_iteration() {
   local iteration="$2"
   local output="$3"
 
-  # Validate loop_id before use
-  if ! validate_loop_id "$loop_id"; then
-    debug_log "ERROR: Skipping iteration log due to invalid loop_id"
+  # Basic sanity check only (loop_id is internally generated)
+  if ! sanity_check_loop_id "$loop_id"; then
     return 1
   fi
 
-  mkdir -p "$TRANSCRIPT_DIR"
+  mkdir -p "$TRANSCRIPT_DIR" 2>/dev/null || return 1
 
   local iterations_file="$TRANSCRIPT_DIR/${loop_id}-iterations.jsonl"
   if ! jq -n -c \
@@ -71,7 +65,7 @@ log_iteration() {
     --arg output "$output" \
     '{iteration: $iteration, timestamp: $timestamp, output: $output}' \
     >> "$iterations_file" 2>>"$DEBUG_LOG"; then
-    debug_log "ERROR: Failed to log iteration $iteration for loop $loop_id to $iterations_file"
+    debug_log "WARNING: Failed to log iteration $iteration for loop $loop_id"
     return 1
   fi
   return 0
@@ -82,18 +76,17 @@ copy_full_transcript() {
   local loop_id="$1"
   local transcript_path="$2"
 
-  # Validate loop_id before use
-  if ! validate_loop_id "$loop_id"; then
-    debug_log "ERROR: Skipping transcript copy due to invalid loop_id"
+  # Basic sanity check only (loop_id is internally generated)
+  if ! sanity_check_loop_id "$loop_id"; then
     return 1
   fi
 
-  mkdir -p "$TRANSCRIPT_DIR"
+  mkdir -p "$TRANSCRIPT_DIR" 2>/dev/null || return 1
 
   if [[ -f "$transcript_path" ]]; then
     local target_file="$TRANSCRIPT_DIR/${loop_id}-full.jsonl"
     if ! cp "$transcript_path" "$target_file" 2>>"$DEBUG_LOG"; then
-      debug_log "ERROR: Failed to copy full transcript to $target_file"
+      debug_log "WARNING: Failed to copy full transcript to $target_file"
       return 1
     fi
     debug_log "Copied full transcript to $target_file"
@@ -395,14 +388,37 @@ TEMP_FILE=$(mktemp "${RALPH_STATE_FILE}.tmp.XXXXXX") || exit 1
 sed "s/^iteration: .*/iteration: $NEXT_ITERATION/" "$RALPH_STATE_FILE" > "$TEMP_FILE"
 mv "$TEMP_FILE" "$RALPH_STATE_FILE"
 
-# Build system message with iteration count, elapsed time, and completion promise info
+# Source checklist service for checklist operations
+CHECKLIST_SERVICE="$PLUGIN_ROOT/scripts/checklist-service.sh"
+if [[ -f "$CHECKLIST_SERVICE" ]]; then
+  # shellcheck source=/dev/null
+  source "$CHECKLIST_SERVICE"
+fi
+
+# Check if checklist exists for this loop
+CHECKLIST_INSTRUCTION=""
+if [[ -n "$LOOP_ID" ]] && declare -f checklist_exists > /dev/null && checklist_exists "$LOOP_ID"; then
+  CHECKLIST_SUMMARY=$(checklist_summary "$LOOP_ID" 2>/dev/null || echo "")
+  CHECKLIST_INSTRUCTION="
+
+📋 CHECKLIST PROGRESS: $CHECKLIST_SUMMARY
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+To update checklist items:
+  checklist_status \"$LOOP_ID\" \"<item_id>\" \"<status>\" [iteration]
+  To add new items:
+  checklist_add \"$LOOP_ID\" \"task|criteria\" \"<id>\" \"<text>\"
+
+  Status values: pending | in_progress | completed"
+fi
+
+# Build system message with iteration count, elapsed time, completion promise, and checklist info
 if [[ "$COMPLETION_PROMISE" != "null" ]] && [[ -n "$COMPLETION_PROMISE" ]]; then
   SYSTEM_MSG="🔄 Ralph iteration $NEXT_ITERATION | Running for $ELAPSED_STR
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 ⚠️  TO COMPLETE: <promise>$COMPLETION_PROMISE</promise>
-    (XML tags REQUIRED - do not output bare text)"
+    (XML tags REQUIRED - do not output bare text)$CHECKLIST_INSTRUCTION"
 else
-  SYSTEM_MSG="🔄 Ralph iteration $NEXT_ITERATION | Running for $ELAPSED_STR | No completion promise - runs until max iterations"
+  SYSTEM_MSG="🔄 Ralph iteration $NEXT_ITERATION | Running for $ELAPSED_STR | No completion promise - runs until max iterations$CHECKLIST_INSTRUCTION"
 fi
 
 # Log this iteration's output before continuing

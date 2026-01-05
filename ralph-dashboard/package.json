@@ -1,6 +1,6 @@
 {
   "name": "ralph-dashboard",
-  "version": "2.1.0",
+  "version": "2.1.1",
   "description": "Web dashboard for Ralph Wiggum loops - view active and archived sessions",
   "type": "module",
   "bin": {
@@ -8,7 +8,7 @@
   },
   "scripts": {
     "dev": "concurrently \"bun run dev:vite\" \"bun run dev:server\"",
-    "dev:server": "bun --watch server/index.ts --port 3847",
+    "dev:server": "bun --watch server/index.ts --port 3847 --host 0.0.0.0",
     "build": "tsc -b && vite build",
     "preview": "vite preview",
     "start": "bun run server/index.ts",
@@ -21,7 +21,7 @@
     "test:coverage:combined": "COVERAGE=true bun run test:coverage && bun run test:e2e && node scripts/merge-coverage.mjs coverage/combined/coverage-final.json coverage/coverage-final.json",
     "typecheck": "tsc --noEmit",
     "lint": "eslint src server --ext .ts,.tsx",
-    "dev:vite": "vite"
+    "dev:vite": "vite --host 0.0.0.0"
   },
   "dependencies": {
     "@tanstack/react-query": "^5.60.0",

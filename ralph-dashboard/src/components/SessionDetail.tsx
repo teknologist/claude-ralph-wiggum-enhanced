@@ -3,6 +3,7 @@ import type { Session } from '../../server/types';
 import { ProgressBar } from './ProgressBar';
 import { TranscriptTimeline } from './TranscriptTimeline';
 import { ErrorBoundary } from './ErrorBoundary';
+import { ChecklistProgress } from './ChecklistProgress';
 import { useMediaQuery } from '../hooks/useMediaQuery';
 import { BREAKPOINTS } from '../constants/breakpoints';
 
@@ -92,6 +93,15 @@ export function SessionDetail({
             status={session.status}
           />
         </div>
+
+        {/* Checklist Progress - shown if checklist exists */}
+        {session.has_checklist && (
+          <div className="md:col-span-2 mt-3 sm:mt-4">
+            <ErrorBoundary>
+              <ChecklistProgress loopId={session.loop_id} />
+            </ErrorBoundary>
+          </div>
+        )}
 
         {/* Advanced section - collapsible on mobile, always visible on desktop */}
         <div className="md:col-span-2">

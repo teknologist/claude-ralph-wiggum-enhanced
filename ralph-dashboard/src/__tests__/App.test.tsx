@@ -41,6 +41,8 @@ const mockSessionsResponse: SessionsResponse = {
       max_iterations: 10,
       completion_promise: 'COMPLETE',
       error_reason: null,
+      has_checklist: false,
+      checklist_progress: null,
     },
   ],
   total: 1,

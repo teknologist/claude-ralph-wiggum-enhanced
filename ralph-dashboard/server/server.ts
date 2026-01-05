@@ -9,6 +9,7 @@ import {
   handleGetFullTranscript,
   handleCheckTranscriptAvailability,
 } from './api/transcript';
+import { handleGetChecklist } from './api/checklist';
 
 interface ServerOptions {
   port: number;
@@ -204,6 +205,18 @@ export function createServer(options: ServerOptions) {
             response = invalidLoopIdResponse();
           } else {
             response = handleCheckTranscriptAvailability(loopId);
+          }
+        }
+        // GET /api/checklist/:loopId
+        else if (
+          path.match(/^\/api\/checklist\/[^/]+$/) &&
+          req.method === 'GET'
+        ) {
+          const loopId = path.split('/').pop()!;
+          if (!validateLoopId(loopId)) {
+            response = invalidLoopIdResponse();
+          } else {
+            response = handleGetChecklist(loopId);
           }
         }
         // 404 for unknown API routes

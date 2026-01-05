@@ -20,6 +20,8 @@ describe('StatsBar', () => {
       max_iterations: 10,
       completion_promise: null,
       error_reason: null,
+      has_checklist: false,
+      checklist_progress: null,
     },
     {
       loop_id: 'loop-success-1',
@@ -37,6 +39,8 @@ describe('StatsBar', () => {
       max_iterations: 10,
       completion_promise: null,
       error_reason: null,
+      has_checklist: false,
+      checklist_progress: null,
     },
     {
       loop_id: 'loop-cancelled-1',
@@ -54,6 +58,8 @@ describe('StatsBar', () => {
       max_iterations: 10,
       completion_promise: null,
       error_reason: null,
+      has_checklist: false,
+      checklist_progress: null,
     },
   ];
 
@@ -105,6 +111,8 @@ describe('StatsBar', () => {
         max_iterations: 10,
         completion_promise: null,
         error_reason: null,
+        has_checklist: false,
+        checklist_progress: null,
       },
     ];
     render(<StatsBar sessions={longSessions} activeCount={0} />);
@@ -130,6 +138,8 @@ describe('StatsBar', () => {
         max_iterations: 10,
         completion_promise: null,
         error_reason: null,
+        has_checklist: false,
+        checklist_progress: null,
       },
     ];
     render(<StatsBar sessions={sessionWithNoDuration} activeCount={0} />);

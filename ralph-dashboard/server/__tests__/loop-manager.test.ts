@@ -48,6 +48,8 @@ describe('loop-manager', () => {
       max_iterations: 10,
       completion_promise: 'Complete test',
       error_reason: null,
+      has_checklist: false,
+      checklist_progress: null,
     };
 
     it('should fail for non-active session', () => {
@@ -167,6 +169,8 @@ describe('loop-manager', () => {
         max_iterations: 5,
         completion_promise: null,
         error_reason: null,
+        has_checklist: false,
+        checklist_progress: null,
       };
 
       const result = checkStateFileExists(session);
@@ -191,6 +195,8 @@ describe('loop-manager', () => {
         max_iterations: 5,
         completion_promise: null,
         error_reason: null,
+        has_checklist: false,
+        checklist_progress: null,
       };
 
       const result = checkStateFileExists(session);
@@ -216,6 +222,8 @@ describe('loop-manager', () => {
         max_iterations: 5,
         completion_promise: null,
         error_reason: null,
+        has_checklist: false,
+        checklist_progress: null,
       };
 
       const result = checkStateFileExists(session);

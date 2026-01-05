@@ -13,6 +13,7 @@ import type {
   CompletionLogEntry,
   Session,
 } from '../types';
+import { getChecklistWithProgress } from './checklist-service.js';
 
 const LOG_FILE = join(
   homedir(),
@@ -228,6 +229,21 @@ export function mergeSessions(entries: LogEntry[]): Session[] {
     const completionPromise = start.completion_promise || extractedPromise;
     const task = cleanedTask ?? start.task;
 
+    // Get checklist data if available
+    let hasChecklist = false;
+    let checklistProgress: string | null = null;
+    try {
+      const checklistResult = getChecklistWithProgress(loop_id);
+      if (checklistResult.checklist) {
+        hasChecklist = true;
+        checklistProgress = checklistResult.progress
+          ? `${checklistResult.progress.tasks} • ${checklistResult.progress.criteria}`
+          : null;
+      }
+    } catch {
+      // Ignore errors reading checklist
+    }
+
     sessions.push({
       loop_id,
       session_id: start.session_id,
@@ -244,6 +260,8 @@ export function mergeSessions(entries: LogEntry[]): Session[] {
       max_iterations: start.max_iterations,
       completion_promise: completionPromise,
       error_reason: completion?.error_reason ?? null,
+      has_checklist: hasChecklist,
+      checklist_progress: checklistProgress,
     });
   }
 

@@ -76,19 +76,26 @@ Apply any filters the user requested:
 
 Sort by `started_at` descending (most recent first), with active sessions at the top.
 
+**Important: The log now includes checklist data.**
+Each session entry may include:
+- `has_checklist`: boolean - whether a checklist exists for this loop
+- `checklist_progress`: string or null - format "X/Y tasks • A/B criteria"
+
+When merging entries, include these fields from the start entry.
+
 Display in this format:
 
 ```
 📊 Ralph Loop Session History
 ═════════════════════════════════════════════════════════════════════════════════════════════════════════
 
-Project         Task                           Iters/Max  Duration  Promise      Status      Started
+Project         Task                           Iters/Max  Checklist           Promise      Status      Started
 ──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
-my-api          Working on feature X...        ?/50       2m        DONE         🔄 active   2024-01-15 10:30
-my-api          Build REST API for todos...    15/50      1h 15m    COMPLETE     ✅ success  2024-01-15 10:30
-my-api          Fix auth bug                   20/20      45m       FIXED        ⏹ max      2024-01-14 14:00
-frontend        Refactor cache layer           8/∞        30m       -            🚫 cancel  2024-01-13 09:15
-my-api          Add rate limiting              3/10       5m        DONE         ❌ error    2024-01-12 16:20
+my-api          Working on feature X...        ?/50       3/5 • 1/2          DONE         🔄 active   2024-01-15 10:30
+my-api          Build REST API for todos...    15/50      -                  COMPLETE     ✅ success  2024-01-15 10:30
+my-api          Fix auth bug                   20/20      2/2 • 1/1          FIXED        ⏹ max      2024-01-14 14:00
+frontend        Refactor cache layer           8/∞        -                  -            🚫 cancel  2024-01-13 09:15
+my-api          Add rate limiting              3/10       -                  DONE         ❌ error    2024-01-12 16:20
 
 ═════════════════════════════════════════════════════════════════════════════════════════════════════════
 Total: 5 sessions | 🔄 1 | ✅ 1 | ⏹ 1 | 🚫 1 | ❌ 1
@@ -96,13 +103,12 @@ Total: 5 sessions | 🔄 1 | ✅ 1 | ⏹ 1 | 🚫 1 | ❌ 1
 
 **Formatting rules:**
 - Project: First 15 chars, truncated with `...` if longer
-- Task: First 30 chars, truncated with `...` if longer
+- Task: First 22 chars, truncated with `...` if longer (reduced to make room for Checklist column)
 - Iters/Max: Show as `X/Y` where Y is max_iterations, or `X/∞` if max_iterations is 0 (unlimited); for active loops show `?/Y`
-- Duration: Format `duration_seconds` as:
-  - `Xh Ym` if >= 1 hour
-  - `Xm` if >= 1 minute but < 1 hour
-  - `Xs` if < 1 minute
-  - For active loops, calculate from started_at to now
+- Checklist: Show `checklist_progress` value (first 18 chars), or `-` if null/empty
+  - Format is typically "X/Y tasks • A/B criteria" but may be truncated
+  - Only show if `has_checklist` is true, otherwise show `-`
+- Duration: (removed from table to make room for Checklist - can be shown in detailed view if needed)
 - Promise: Show `completion_promise` value (first 12 chars), or `-` if null/empty
 - Status with emoji:
   - Active (no completion) → `🔄 active`

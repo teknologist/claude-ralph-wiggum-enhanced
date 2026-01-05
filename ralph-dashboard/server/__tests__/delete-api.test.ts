@@ -38,6 +38,8 @@ describe('handleDeleteSession', () => {
       max_iterations: 10,
       completion_promise: null,
       error_reason: null,
+      has_checklist: false,
+      checklist_progress: null,
     };
 
     vi.spyOn(logParser, 'getSessionById').mockReturnValue(activeSession);
@@ -67,6 +69,8 @@ describe('handleDeleteSession', () => {
       max_iterations: 10,
       completion_promise: null,
       error_reason: null,
+      has_checklist: false,
+      checklist_progress: null,
     };
 
     vi.spyOn(logParser, 'getSessionById').mockReturnValue(completedSession);
@@ -96,6 +100,8 @@ describe('handleDeleteSession', () => {
       max_iterations: 10,
       completion_promise: null,
       error_reason: null,
+      has_checklist: false,
+      checklist_progress: null,
     };
 
     vi.spyOn(logParser, 'getSessionById').mockReturnValue(completedSession);
@@ -127,6 +133,8 @@ describe('handleDeleteSession', () => {
       max_iterations: 10,
       completion_promise: null,
       error_reason: null,
+      has_checklist: false,
+      checklist_progress: null,
     };
 
     vi.spyOn(logParser, 'getSessionById').mockReturnValue(cancelledSession);
@@ -156,6 +164,8 @@ describe('handleDeleteSession', () => {
       max_iterations: 10,
       completion_promise: null,
       error_reason: 'Something failed',
+      has_checklist: false,
+      checklist_progress: null,
     };
 
     vi.spyOn(logParser, 'getSessionById').mockReturnValue(errorSession);
@@ -185,6 +195,8 @@ describe('handleDeleteSession', () => {
       max_iterations: 10,
       completion_promise: null,
       error_reason: null,
+      has_checklist: false,
+      checklist_progress: null,
     };
 
     vi.spyOn(logParser, 'getSessionById').mockReturnValue(maxIterSession);

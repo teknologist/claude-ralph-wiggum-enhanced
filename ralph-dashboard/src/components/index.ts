@@ -10,3 +10,4 @@ export { ProgressBar } from './ProgressBar';
 export { ErrorBoundary } from './ErrorBoundary';
 export { TranscriptTimeline } from './TranscriptTimeline';
 export { FullTranscriptModal } from './FullTranscriptModal';
+export { ChecklistProgress } from './ChecklistProgress';
