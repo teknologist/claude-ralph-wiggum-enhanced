@@ -68,4 +68,54 @@ describe('ConfirmModal', () => {
       expect(onCancel).toHaveBeenCalledTimes(1);
     }
   });
+
+  it('should call onCancel when pressing ESC key', () => {
+    const onCancel = vi.fn();
+    render(<ConfirmModal {...defaultProps} onCancel={onCancel} />);
+
+    fireEvent.keyDown(document, { key: 'Escape', code: 'Escape' });
+    expect(onCancel).toHaveBeenCalledTimes(1);
+  });
+
+  it('should not call onCancel when pressing ESC key while loading', () => {
+    const onCancel = vi.fn();
+    render(<ConfirmModal {...defaultProps} onCancel={onCancel} isLoading />);
+
+    fireEvent.keyDown(document, { key: 'Escape', code: 'Escape' });
+    expect(onCancel).not.toHaveBeenCalled();
+  });
+
+  it('should trap focus within modal when Tab is pressed', () => {
+    render(<ConfirmModal {...defaultProps} />);
+
+    const confirmButton = screen.getByText('Confirm').closest('button');
+    const cancelButton = screen.getByText('Cancel').closest('button');
+
+    // Focus should start on confirm button (via useEffect)
+    expect(document.activeElement).toBe(confirmButton);
+
+    // Press Tab - focus should move to cancel button
+    if (confirmButton && cancelButton) {
+      fireEvent.keyDown(confirmButton as HTMLElement, { key: 'Tab' });
+      // Focus trap should keep focus within modal
+      expect(document.activeElement).toBe(cancelButton);
+    }
+  });
+
+  it('should trap focus in reverse when Shift+Tab is pressed', () => {
+    render(<ConfirmModal {...defaultProps} />);
+
+    const confirmButton = screen.getByText('Confirm').closest('button');
+    const cancelButton = screen.getByText('Cancel').closest('button');
+
+    if (cancelButton && confirmButton) {
+      cancelButton.focus();
+      fireEvent.keyDown(cancelButton as HTMLElement, {
+        key: 'Tab',
+        shiftKey: true,
+      });
+      // Focus trap should keep focus within modal, moving back to confirm
+      expect(document.activeElement).toBe(confirmButton);
+    }
+  });
 });

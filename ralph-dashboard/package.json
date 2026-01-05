@@ -17,6 +17,8 @@
     "test:coverage": "vitest run --coverage",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
+    "test:e2e:coverage": "COVERAGE=true playwright test",
+    "test:coverage:combined": "COVERAGE=true bun run test:coverage && bun run test:e2e && node scripts/merge-coverage.mjs coverage/combined/coverage-final.json coverage/coverage-final.json",
     "typecheck": "tsc --noEmit",
     "lint": "eslint src server --ext .ts,.tsx",
     "dev:vite": "vite"
@@ -42,6 +44,7 @@
     "concurrently": "^9.2.1",
     "eslint": "^9.16.0",
     "jsdom": "^25.0.0",
+    "monocart-coverage-reports": "^2.12.9",
     "postcss": "^8.4.49",
     "tailwindcss": "^3.4.0",
     "typescript": "^5.7.0",

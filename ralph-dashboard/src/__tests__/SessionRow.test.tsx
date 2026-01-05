@@ -13,6 +13,15 @@ vi.mock('../hooks/useCancelLoop', () => ({
   }),
 }));
 
+// Mock the useDeleteSession hook
+const mockDeleteMutate = vi.fn();
+vi.mock('../hooks/useDeleteSession', () => ({
+  useDeleteSession: () => ({
+    mutate: mockDeleteMutate,
+    isPending: false,
+  }),
+}));
+
 function createWrapper() {
   const queryClient = new QueryClient({
     defaultOptions: {
@@ -365,6 +374,143 @@ describe('SessionRow', () => {
       expect(mockMutate).toHaveBeenCalledWith(
         'shared-id-123',
         expect.any(Object)
+      );
+    });
+  });
+
+  describe('delete functionality', () => {
+    it('shows delete modal when delete button is clicked', async () => {
+      renderRow(createMockSession({ status: 'success' }));
+
+      // Expand row to see delete button
+      const row = screen.getByText('test-project').closest('tr');
+      fireEvent.click(row!);
+
+      // Click delete button
+      const deleteButton = screen.getByText('🗑 Delete Permanently');
+      fireEvent.click(deleteButton);
+
+      // Modal should appear
+      await waitFor(() => {
+        expect(screen.getByText('Delete Permanently?')).toBeInTheDocument();
+      });
+    });
+
+    it('closes modal when Keep in History is clicked', async () => {
+      renderRow(createMockSession({ status: 'success' }));
+
+      // Expand and click delete
+      const row = screen.getByText('test-project').closest('tr');
+      fireEvent.click(row!);
+      fireEvent.click(screen.getByText('🗑 Delete Permanently'));
+
+      await waitFor(() => {
+        expect(screen.getByText('Delete Permanently?')).toBeInTheDocument();
+      });
+
+      // Click Keep in History
+      fireEvent.click(screen.getByText('Keep in History'));
+
+      await waitFor(() => {
+        expect(
+          screen.queryByText('Delete Permanently?')
+        ).not.toBeInTheDocument();
+      });
+    });
+
+    it('calls mutate when confirming delete', async () => {
+      renderRow(createMockSession({ loop_id: 'loop-456', status: 'success' }));
+
+      // Expand and click delete
+      const row = screen.getByText('test-project').closest('tr');
+      fireEvent.click(row!);
+      fireEvent.click(screen.getByText('🗑 Delete Permanently'));
+
+      await waitFor(() => {
+        expect(screen.getByText('Delete Permanently?')).toBeInTheDocument();
+      });
+
+      // Confirm delete - find the confirm button with bg-claude-coral class
+      const buttons = screen.getAllByRole('button');
+      const confirmButton = buttons.find(
+        (btn) =>
+          btn.textContent === 'Delete Permanently' &&
+          btn.classList.contains('bg-claude-coral')
+      );
+      fireEvent.click(confirmButton!);
+
+      expect(mockDeleteMutate).toHaveBeenCalledWith(
+        'loop-456',
+        expect.any(Object)
+      );
+    });
+
+    it('closes modal and row on successful delete', async () => {
+      // Mock mutate to call onSuccess
+      mockDeleteMutate.mockImplementation((_loopId, options) => {
+        options?.onSuccess?.();
+      });
+
+      renderRow(createMockSession({ loop_id: 'loop-456', status: 'success' }));
+
+      // Expand and click delete
+      const row = screen.getByText('test-project').closest('tr');
+      fireEvent.click(row!);
+      fireEvent.click(screen.getByText('🗑 Delete Permanently'));
+
+      await waitFor(() => {
+        expect(screen.getByText('Delete Permanently?')).toBeInTheDocument();
+      });
+
+      // Confirm delete
+      const buttons = screen.getAllByRole('button');
+      const confirmButton = buttons.find(
+        (btn) =>
+          btn.textContent === 'Delete Permanently' &&
+          btn.classList.contains('bg-claude-coral')
+      );
+      fireEvent.click(confirmButton!);
+
+      // Modal should be closed
+      await waitFor(() => {
+        expect(
+          screen.queryByText('Delete Permanently?')
+        ).not.toBeInTheDocument();
+      });
+
+      // Row should be collapsed (Project Path is detail content)
+      expect(screen.queryByText('Project Path')).not.toBeInTheDocument();
+    });
+
+    it('shows alert on delete error', async () => {
+      // Mock mutate to call onError
+      mockDeleteMutate.mockImplementation((_loopId, options) => {
+        options?.onError?.(new Error('Delete failed'));
+      });
+
+      renderRow(createMockSession({ loop_id: 'loop-456', status: 'success' }));
+
+      // Expand and click delete
+      const row = screen.getByText('test-project').closest('tr');
+      fireEvent.click(row!);
+      fireEvent.click(screen.getByText('🗑 Delete Permanently'));
+
+      await waitFor(() => {
+        expect(screen.getByText('Delete Permanently?')).toBeInTheDocument();
+      });
+
+      // Confirm delete
+      const buttons = screen.getAllByRole('button');
+      const confirmButton = buttons.find(
+        (btn) =>
+          btn.textContent === 'Delete Permanently' &&
+          btn.classList.contains('bg-claude-coral')
+      );
+      fireEvent.click(confirmButton!);
+
+      // Alert should have been called
+      expect(global.alert).toHaveBeenCalledWith(
+        'Failed to delete: Delete failed'
       );
     });
   });

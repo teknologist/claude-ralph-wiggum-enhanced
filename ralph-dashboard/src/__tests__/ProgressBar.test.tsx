@@ -153,4 +153,16 @@ describe('ProgressBar', () => {
       expect(screen.getByText('Iterations')).toBeInTheDocument();
     });
   });
+
+  describe('compact prop', () => {
+    it('shows label when compact is true (sm size)', () => {
+      render(<ProgressBar current={5} max={20} size="sm" compact showLabel />);
+      expect(screen.getByText('5/20')).toBeInTheDocument();
+    });
+
+    it('hides detailed label when compact is true, but shows compact label', () => {
+      render(<ProgressBar current={5} max={20} size="sm" compact />);
+      expect(screen.getByText('5/20')).toBeInTheDocument();
+    });
+  });
 });

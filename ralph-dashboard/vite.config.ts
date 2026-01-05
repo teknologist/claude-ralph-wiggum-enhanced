@@ -20,6 +20,8 @@ export default defineConfig({
   build: {
     outDir: 'dist',
     emptyOutDir: true,
+    // Add source maps for coverage (only when COVERAGE=true)
+    sourcemap: process.env.COVERAGE === 'true' ? true : false,
   },
   server: {
     proxy: {

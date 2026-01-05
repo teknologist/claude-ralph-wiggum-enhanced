@@ -1,3 +1,4 @@
+/// <reference types="monocart-coverage-reports" />
 import { defineConfig, devices } from '@playwright/test';
 
 export default defineConfig({
@@ -6,7 +7,22 @@ export default defineConfig({
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
   workers: process.env.CI ? 1 : undefined,
-  reporter: [['html', { outputFolder: 'playwright-report' }], ['list']],
+  reporter: [
+    ['html', { outputFolder: 'playwright-report' }],
+    ['list'],
+    // Add monocart coverage reporter
+    [
+      'monocart-coverage-reports',
+      {
+        outputFolder: 'coverage/e2e',
+        reports: [
+          ['json', { file: 'coverage-final.json' }],
+          ['lcov'],
+          ['html'],
+        ],
+      },
+    ],
+  ],
   use: {
     baseURL: 'http://localhost:3847',
     trace: 'on-first-retry',
@@ -19,7 +35,7 @@ export default defineConfig({
     },
   ],
   webServer: {
-    command: 'bun run dev',
+    command: 'COVERAGE=true bun run dev',
     url: 'http://localhost:3847',
     reuseExistingServer: !process.env.CI,
     timeout: 30000,

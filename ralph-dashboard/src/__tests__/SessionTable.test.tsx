@@ -260,4 +260,23 @@ describe('SessionTable', () => {
 
     expect(screen.getByText('No active loops')).toBeInTheDocument();
   });
+
+  it('renders card view mode correctly', () => {
+    const sessions: Session[] = [
+      createMockSession({ session_id: '1', project_name: 'project-1' }),
+      createMockSession({ session_id: '2', project_name: 'project-2' }),
+    ];
+    render(
+      <SessionTable
+        sessions={sessions}
+        viewMode="card"
+        setViewMode={mockSetViewMode}
+      />,
+      { wrapper: createWrapper() }
+    );
+
+    // Should render session cards in grid layout
+    expect(screen.getByText('project-1')).toBeInTheDocument();
+    expect(screen.getByText('project-2')).toBeInTheDocument();
+  });
 });

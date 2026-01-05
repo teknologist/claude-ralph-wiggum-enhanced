@@ -12,7 +12,7 @@ on:
     paths:
       - 'ralph-dashboard/**'
       - 'plugins/ralph-wiggum-pro/**'
-  workflow_dispatch:  # Allow manual triggers
+  workflow_dispatch: # Allow manual triggers
 
 defaults:
   run:
@@ -35,7 +35,7 @@ jobs:
     name: Test
     runs-on: ubuntu-latest
     permissions:
-      contents: write  # Allow pushing badge updates
+      contents: write # Allow pushing badge updates
 
     steps:
       - name: Checkout
@@ -64,13 +64,13 @@ jobs:
           echo "test_count=$TEST_COUNT" >> $GITHUB_OUTPUT
 
       - name: Run tests with coverage
-        run: bun run test:coverage
-        continue-on-error: true  # Don't fail on coverage thresholds
+        run: bun run test:coverage:combined
+        continue-on-error: true # Don't fail on coverage thresholds
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v4
         with:
-          files: ralph-dashboard/coverage/lcov.info
+          files: ralph-dashboard/coverage/coverage-final.json
           flags: ralph-dashboard
           name: ralph-dashboard-coverage
           fail_ci_if_error: false
