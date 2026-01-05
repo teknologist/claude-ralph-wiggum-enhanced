@@ -86,11 +86,13 @@ export function ProgressBar({
 
   // Detailed view for SessionDetail
   return (
-    <div className="space-y-2">
-      <div className="flex items-center justify-between">
-        <label className="text-sm font-medium text-gray-500">Iterations</label>
+    <div>
+      <div className="flex items-center justify-between mb-1">
+        <label className="text-xs sm:text-sm font-medium text-gray-500">
+          Iterations
+        </label>
         {showPercentage && (
-          <span className="text-sm font-semibold text-claude-dark">
+          <span className="text-xs sm:text-sm font-semibold text-claude-dark">
             {percentage}%
           </span>
         )}
@@ -104,8 +106,8 @@ export function ProgressBar({
         />
       </div>
       {showLabel && (
-        <div className="text-xs text-gray-500 text-center">
-          {current} / {max} iterations
+        <div className="text-sm sm:text-base font-semibold text-claude-dark text-right mt-1">
+          {current} / {max}
         </div>
       )}
     </div>

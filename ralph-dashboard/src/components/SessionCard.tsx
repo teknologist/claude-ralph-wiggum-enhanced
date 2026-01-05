@@ -145,19 +145,21 @@ export function SessionCard({ session }: SessionCardProps) {
           {/* Separator */}
           <div className="border-t border-gray-100 my-3" />
 
-          {/* Progress Bar + Iterations */}
-          <div className="flex items-center gap-3 mb-3">
-            <div className="flex-1">
-              <ProgressBar
-                current={session.iterations}
-                max={session.max_iterations}
-                size="sm"
-                showLabel
-                status={session.status}
-                compact
-              />
+          {/* Progress Bar + Iterations - hidden when expanded to avoid duplicate with SessionDetail */}
+          {!isExpanded && (
+            <div className="flex items-center gap-3 mb-3">
+              <div className="flex-1">
+                <ProgressBar
+                  current={session.iterations}
+                  max={session.max_iterations}
+                  size="sm"
+                  showLabel
+                  status={session.status}
+                  compact
+                />
+              </div>
             </div>
-          </div>
+          )}
 
           {/* Time Info */}
           <div className="flex items-center gap-3 text-xs text-gray-500">

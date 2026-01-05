@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import type { Session } from '../../server/types';
 import { ProgressBar } from './ProgressBar';
-import { StatusBadge } from './StatusBadge';
 import { useMediaQuery } from '../hooks/useMediaQuery';
 import { BREAKPOINTS } from '../constants/breakpoints';
 
@@ -50,26 +49,37 @@ export function SessionDetail({
   return (
     <div id={id} className="bg-gray-50 p-3 sm:p-4 border-t border-gray-200">
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
-        {/* Always visible: Status and Duration */}
-        <div>
-          <label className="text-xs sm:text-sm font-medium text-gray-500">
-            Status
-          </label>
-          <p className="mt-1 text-claude-dark text-sm">
-            <StatusBadge status={session.status} />
-          </p>
+        {/* Started At, Ended At, Duration on same line */}
+        <div className="md:col-span-2 flex flex-col sm:flex-row sm:justify-between gap-3 sm:gap-4">
+          <div>
+            <label className="text-xs sm:text-sm font-medium text-gray-500">
+              Started
+            </label>
+            <p className="mt-1 text-claude-dark text-xs sm:text-sm">
+              {formatDate(session.started_at)}
+            </p>
+          </div>
+          {session.ended_at && (
+            <div>
+              <label className="text-xs sm:text-sm font-medium text-gray-500">
+                Ended
+              </label>
+              <p className="mt-1 text-claude-dark text-xs sm:text-sm">
+                {formatDate(session.ended_at)}
+              </p>
+            </div>
+          )}
+          <div>
+            <label className="text-xs sm:text-sm font-medium text-gray-500">
+              Duration
+            </label>
+            <p className="mt-1 text-claude-dark text-xs sm:text-sm">
+              {formatDuration(session.duration_seconds)}
+            </p>
+          </div>
         </div>
 
-        <div>
-          <label className="text-xs sm:text-sm font-medium text-gray-500">
-            Duration
-          </label>
-          <p className="mt-1 text-claude-dark text-sm">
-            {formatDuration(session.duration_seconds)}
-          </p>
-        </div>
-
-        {/* Always visible: Iterations */}
+        {/* Iterations - alone on a line */}
         <div className="md:col-span-2">
           <ProgressBar
             current={session.iterations}
@@ -102,30 +112,30 @@ export function SessionDetail({
 
           {shouldShowAdvanced && (
             <div className="md:mt-0 mt-3 sm:mt-4 space-y-3 sm:space-y-4">
-              {/* Loop ID */}
-              <div>
-                <label className="text-xs sm:text-sm font-medium text-gray-500">
-                  Loop ID
-                </label>
-                <p
-                  className="mt-1 text-claude-dark font-mono text-xs sm:text-sm break-all sm:truncate sm:break-normal"
-                  title={session.loop_id}
-                >
-                  {session.loop_id}
-                </p>
-              </div>
-
-              {/* Session ID */}
-              <div>
-                <label className="text-xs sm:text-sm font-medium text-gray-500">
-                  Session ID
-                </label>
-                <p
-                  className="mt-1 text-claude-dark font-mono text-xs sm:text-sm break-all sm:truncate sm:break-normal"
-                  title={session.session_id}
-                >
-                  {session.session_id}
-                </p>
+              {/* Session ID and Loop ID on same line */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+                <div>
+                  <label className="text-xs sm:text-sm font-medium text-gray-500">
+                    Session ID
+                  </label>
+                  <p
+                    className="mt-1 text-claude-dark font-mono text-xs sm:text-sm break-all sm:truncate sm:break-normal"
+                    title={session.session_id}
+                  >
+                    {session.session_id}
+                  </p>
+                </div>
+                <div>
+                  <label className="text-xs sm:text-sm font-medium text-gray-500">
+                    Loop ID
+                  </label>
+                  <p
+                    className="mt-1 text-claude-dark font-mono text-xs sm:text-sm break-all sm:truncate sm:break-normal"
+                    title={session.loop_id}
+                  >
+                    {session.loop_id}
+                  </p>
+                </div>
               </div>
 
               {/* Project Path */}
@@ -136,28 +146,6 @@ export function SessionDetail({
                 <p className="mt-1 text-claude-dark font-mono text-xs sm:text-sm break-all">
                   {session.project}
                 </p>
-              </div>
-
-              {/* Started At and Ended At */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
-                <div>
-                  <label className="text-xs sm:text-sm font-medium text-gray-500">
-                    Started
-                  </label>
-                  <p className="mt-1 text-claude-dark text-xs sm:text-sm">
-                    {formatDate(session.started_at)}
-                  </p>
-                </div>
-                {session.ended_at && (
-                  <div>
-                    <label className="text-xs sm:text-sm font-medium text-gray-500">
-                      Ended
-                    </label>
-                    <p className="mt-1 text-claude-dark text-xs sm:text-sm">
-                      {formatDate(session.ended_at)}
-                    </p>
-                  </div>
-                )}
               </div>
 
               {/* Task */}
