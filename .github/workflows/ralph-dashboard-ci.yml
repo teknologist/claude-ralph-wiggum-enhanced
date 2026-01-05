@@ -60,7 +60,10 @@ jobs:
           OUTPUT=$(bun run test 2>&1)
           echo "$OUTPUT"
           # Extract test count (e.g., "Tests  36 passed (36)")
-          TEST_COUNT=$(echo "$OUTPUT" | grep -oP 'Tests\s+\K\d+(?=\s+passed)' || echo "0")
+          # Use sed for POSIX compatibility
+          TEST_COUNT=$(echo "$OUTPUT" | grep -E 'Tests[[:space:]]+[0-9]+[[:space:]]+passed' | sed -E 's/.*Tests[[:space:]]+([0-9]+)[[:space:]]+passed.*/\1/')
+          # Fallback to 0 if extraction failed
+          TEST_COUNT=${TEST_COUNT:-0}
           echo "test_count=$TEST_COUNT" >> $GITHUB_OUTPUT
 
       - name: Run tests with coverage
@@ -68,7 +71,7 @@ jobs:
         continue-on-error: true # Don't fail on coverage thresholds
 
       - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v4
+        uses: codecov/codecov-action@v5
         with:
           files: ralph-dashboard/coverage/coverage-final.json
           flags: ralph-dashboard
@@ -78,9 +81,11 @@ jobs:
 
       - name: Upload test results to Codecov
         if: ${{ !cancelled() }}
-        uses: codecov/test-results-action@v1
+        uses: codecov/codecov-action@v5
         with:
           files: ralph-dashboard/test-report.junit.xml
+          report_type: test_results
+          fail_ci_if_error: false
           token: ${{ secrets.CODECOV_TOKEN }}
 
       - name: Generate coverage badge
@@ -112,7 +117,9 @@ jobs:
             git config user.email "github-actions[bot]@users.noreply.github.com"
             git add ralph-dashboard/README.md
             git commit -m "docs(ralph-dashboard): update test count badge to $TEST_COUNT"
-            git push
+            # Pull first to avoid race conditions, then push
+            git pull --rebase --autostash || git rebase origin/main || true
+            git push --no-verify
           fi
 
   build:
