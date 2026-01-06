@@ -9,3 +9,5 @@
 counter.txt
 /test-stop-hook-promise-detection.sh
 /counterglm.txt
+/ralph-dashboard/playwright-report
+/ralph-dashboard/test-results
