@@ -165,7 +165,7 @@ Claude Code may internally regenerate session IDs (e.g., after `/clear` or when 
 
 This ensures Ralph loops continue working even when session IDs change internally.
 
-> **Note**: This PPID-based workaround is necessary because `CLAUDE_SESSION_ID` is only available to hooks, not to slash commands. There is an [open feature request](https://github.com/anthropics/claude-code/issues/13735) on the Claude Code GitHub repository asking for session IDs to be exposed to commands as well.
+> **Note**: This PPID-based workaround is necessary because `CLAUDE_SESSION_ID` is only available to hooks, not to slash commands. There is an [open feature request](https://github.com/anthropics/claude-code/issues/1407) on the Claude Code GitHub repository asking for session IDs to be exposed to commands as well.
 
 ## Quick Start
 
