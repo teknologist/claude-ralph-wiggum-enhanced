@@ -187,7 +187,8 @@ fi
 # This fixes the issue where subsequent loops fail because Claude Code generates
 # a new session ID without triggering session-start-hook to update the PPID file.
 # By updating here, setup-ralph-loop.sh will always read the correct session ID.
-PPID_FILE=$(find_ppid_file_from_process_tree)
+# Note: || true prevents set -e from exiting when no PPID file exists (normal case)
+PPID_FILE=$(find_ppid_file_from_process_tree) || true
 if [[ -n "$PPID_FILE" ]] && [[ -f "$PPID_FILE" ]]; then
   CURRENT_PPID_SESSION=$(cat "$PPID_FILE" 2>/dev/null || echo "")
   if [[ "$CURRENT_PPID_SESSION" != "$CURRENT_SESSION_ID" ]]; then

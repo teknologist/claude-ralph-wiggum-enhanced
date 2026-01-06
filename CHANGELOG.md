@@ -7,12 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.2.10] - 2026-01-06
+
 ### Fixed
+- **Stop Hook Exits With Error When No Active Loop**: Fixed bug where stop hook failed with exit code 1 when called outside a Ralph loop
+  - Root cause: `find_ppid_file_from_process_tree()` returns exit code 1 when no PPID file exists (normal case). With `set -euo pipefail`, this caused the script to exit immediately instead of gracefully continuing
+  - Fix: Added `|| true` to the PPID file lookup to suppress the non-zero exit code
 - **Premature Completion on First Iteration**: Fixed bug where Ralph loops would terminate immediately on first iteration when prompt contained `<promise>...</promise>` markup
   - Root cause: `setup-ralph-loop.sh` echoed the prompt to stdout, causing agent to repeat it in response including promise tags, triggering stop-hook completion detection
   - Fix: Removed prompt echo from setup script - prompt is only stored in state file and fed back by stop hook on subsequent iterations
-
-## [2.2.10] - 2026-01-06
 
 ## [2.2.9] - 2026-01-06
 
