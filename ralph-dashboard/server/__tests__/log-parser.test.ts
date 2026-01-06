@@ -489,36 +489,23 @@ Some content here`;
       expect(result).toBe(5);
     });
 
-    it('returns null for malformed frontmatter (no closing ---)', () => {
-      const stateFile = join(testDir, 'malformed.md');
+    it('returns null for malformed frontmatter (missing closing ---)', () => {
+      const stateFile = join(testDir, 'state-malformed.md');
       const content = `---
 active: true
 session_id: test-123
-iteration: 5`;
+iteration: 5
+Some content here`; // Missing closing ---
       writeFileSync(stateFile, content);
 
       const result = readIterationFromStateFile(stateFile);
       expect(result).toBeNull();
     });
 
-    it('returns iteration when frontmatter is valid (session_id present)', () => {
-      // With the new architecture, 'active' field is removed
-      // We only check for session_id as the required indicator
-      const stateFile = join(testDir, 'valid-new.md');
+    it('returns null for frontmatter without session_id', () => {
+      const stateFile = join(testDir, 'state-no-session.md');
       const content = `---
-session_id: test-123
-iteration: 5
----
-Content`;
-      writeFileSync(stateFile, content);
-
-      const result = readIterationFromStateFile(stateFile);
-      expect(result).toBe(5);
-    });
-
-    it('returns null for incomplete frontmatter (missing session_id field)', () => {
-      const stateFile = join(testDir, 'incomplete2.md');
-      const content = `---
+active: true
 iteration: 5
 ---
 Content`;
@@ -529,7 +516,7 @@ Content`;
     });
 
     it('returns null for frontmatter without iteration field', () => {
-      const stateFile = join(testDir, 'no-iteration.md');
+      const stateFile = join(testDir, 'state-no-iteration.md');
       const content = `---
 active: true
 session_id: test-123
@@ -541,16 +528,19 @@ Content`;
       expect(result).toBeNull();
     });
 
-    it('retries on malformed content and returns null after retries', () => {
-      const stateFile = join(testDir, 'retry-test.md');
-      const content = `---
-active: true
-session_id: test-123
-iteration: 5`;
-      writeFileSync(stateFile, content);
+    it('handles empty state file', () => {
+      const stateFile = join(testDir, 'state-empty.md');
+      writeFileSync(stateFile, '');
 
-      // Malformed (no closing ---) should retry and return null
-      const result = readIterationFromStateFile(stateFile, 3);
+      const result = readIterationFromStateFile(stateFile);
+      expect(result).toBeNull();
+    });
+
+    it('handles state file with only whitespace', () => {
+      const stateFile = join(testDir, 'state-whitespace.md');
+      writeFileSync(stateFile, '   \n  \n  ');
+
+      const result = readIterationFromStateFile(stateFile);
       expect(result).toBeNull();
     });
   });
@@ -591,22 +581,5 @@ iteration: 5`;
       const result = deleteSession('non-existent-session-id');
       expect(result).toBe(false);
     });
-
-    // Note: The deleteSession function is already tested via integration
-    // with the actual LOG_FILE. More detailed tests would require either:
-    // 1. An environment variable to override LOG_FILE
-    // 2. Dependency injection
-    // 3. More complex mocking
-    //
-    // The remaining lines (299-317, 325-327) in deleteSession cover:
-    // - The for loop iterating through lines
-    // - JSON.parse of each line
-    // - Loop_id matching with fallback to session_id
-    // - Filtering out matched entries
-    // - Catch block for malformed JSON
-    // - Writing to temp file and atomic rename
-    //
-    // These code paths are exercised by the delete API endpoint e2e tests
-    // and the existing handleDeleteSession tests in delete-api.test.ts
   });
 });

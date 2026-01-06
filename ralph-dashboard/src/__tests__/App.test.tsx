@@ -76,7 +76,7 @@ describe('App', () => {
 
     expect(
       screen.getByText(
-        'Ralph Dashboard - Part of the Ralph Wiggum plugin for Claude Code'
+        'Ralph Dashboard - Part of the Ralph Wiggum Pro plugin for Claude Code - Crafted with ❤️ in Biarritz'
       )
     ).toBeInTheDocument();
   });

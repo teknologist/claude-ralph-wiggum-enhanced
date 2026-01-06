@@ -68,7 +68,10 @@ export function App() {
       </main>
 
       <footer className="mt-8 py-4 text-center text-gray-500 text-sm">
-        <p>Ralph Dashboard - Part of the Ralph Wiggum plugin for Claude Code</p>
+        <p>
+          Ralph Dashboard - Part of the Ralph Wiggum Pro plugin for Claude Code
+          - Crafted with ❤️ in Biarritz
+        </p>
       </footer>
     </div>
   );

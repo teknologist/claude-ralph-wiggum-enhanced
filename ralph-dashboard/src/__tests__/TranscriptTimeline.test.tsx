@@ -519,4 +519,171 @@ describe('TranscriptTimeline', () => {
       });
     });
   });
+
+  describe('duration formatting', () => {
+    it('shows "Xm total" for exact minute durations (no seconds)', async () => {
+      vi.mocked(global.fetch).mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          iterations: [
+            { iteration: 1, timestamp: '2024-01-15T10:00:00Z', output: 'Test' },
+          ],
+        }),
+      } as Response);
+
+      render(
+        <TranscriptTimeline
+          session={createMockSession({
+            status: 'success',
+            duration_seconds: 120, // 2 minutes exactly
+          })}
+        />,
+        { wrapper: createWrapper() }
+      );
+
+      fireEvent.click(screen.getByText('Transcript'));
+
+      await waitFor(() => {
+        expect(screen.getByText('2m total')).toBeInTheDocument();
+      });
+    });
+
+    it('shows "Xh total" for exact hour durations (no minutes)', async () => {
+      vi.mocked(global.fetch).mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          iterations: [
+            { iteration: 1, timestamp: '2024-01-15T10:00:00Z', output: 'Test' },
+          ],
+        }),
+      } as Response);
+
+      render(
+        <TranscriptTimeline
+          session={createMockSession({
+            status: 'success',
+            duration_seconds: 3600, // 1 hour exactly
+          })}
+        />,
+        { wrapper: createWrapper() }
+      );
+
+      fireEvent.click(screen.getByText('Transcript'));
+
+      await waitFor(() => {
+        expect(screen.getByText('1h total')).toBeInTheDocument();
+      });
+    });
+
+    it('shows "Xm Ys total" for minute and second durations', async () => {
+      vi.mocked(global.fetch).mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          iterations: [
+            { iteration: 1, timestamp: '2024-01-15T10:00:00Z', output: 'Test' },
+          ],
+        }),
+      } as Response);
+
+      render(
+        <TranscriptTimeline
+          session={createMockSession({
+            status: 'success',
+            duration_seconds: 150, // 2 minutes 30 seconds
+          })}
+        />,
+        { wrapper: createWrapper() }
+      );
+
+      fireEvent.click(screen.getByText('Transcript'));
+
+      await waitFor(() => {
+        expect(screen.getByText('2m 30s total')).toBeInTheDocument();
+      });
+    });
+
+    it('shows "Xh Ym total" for hour and minute durations', async () => {
+      vi.mocked(global.fetch).mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          iterations: [
+            { iteration: 1, timestamp: '2024-01-15T10:00:00Z', output: 'Test' },
+          ],
+        }),
+      } as Response);
+
+      render(
+        <TranscriptTimeline
+          session={createMockSession({
+            status: 'success',
+            duration_seconds: 5400, // 1 hour 30 minutes
+          })}
+        />,
+        { wrapper: createWrapper() }
+      );
+
+      fireEvent.click(screen.getByText('Transcript'));
+
+      await waitFor(() => {
+        expect(screen.getByText('1h 30m total')).toBeInTheDocument();
+      });
+    });
+
+    it('shows no duration text when duration_seconds is null', async () => {
+      vi.mocked(global.fetch).mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          iterations: [
+            { iteration: 1, timestamp: '2024-01-15T10:00:00Z', output: 'Test' },
+          ],
+        }),
+      } as Response);
+
+      render(
+        <TranscriptTimeline
+          session={createMockSession({
+            status: 'success',
+            duration_seconds: undefined,
+          })}
+        />,
+        { wrapper: createWrapper() }
+      );
+
+      fireEvent.click(screen.getByText('Transcript'));
+
+      await waitFor(() => {
+        expect(screen.getByText('COMPLETED')).toBeInTheDocument();
+        // Should not show any duration text
+        expect(screen.queryByText(/total/)).not.toBeInTheDocument();
+      });
+    });
+
+    it('handles unknown status gracefully', async () => {
+      vi.mocked(global.fetch).mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          iterations: [
+            { iteration: 1, timestamp: '2024-01-15T10:00:00Z', output: 'Test' },
+          ],
+        }),
+      } as Response);
+
+      // Create a session with a status that doesn't match any known type
+      render(
+        <TranscriptTimeline
+          session={createMockSession({
+            status: 'unknown' as any,
+          })}
+        />,
+        { wrapper: createWrapper() }
+      );
+
+      fireEvent.click(screen.getByText('Transcript'));
+
+      await waitFor(() => {
+        // Should render transcript but completion status should be null (fallback)
+        expect(screen.getByText('USER PROMPT')).toBeInTheDocument();
+      });
+    });
+  });
 });

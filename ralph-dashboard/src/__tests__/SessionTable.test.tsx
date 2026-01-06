@@ -13,10 +13,13 @@ vi.mock('../hooks/useCancelLoop', () => ({
 }));
 
 // Mock the useDeleteAllArchived hook
+let mockDeleteAllMutate = vi.fn();
+let mockDeleteAllPending = false;
+
 vi.mock('../hooks/useDeleteAllArchived', () => ({
   useDeleteAllArchived: () => ({
-    mutate: vi.fn(),
-    isPending: false,
+    mutate: mockDeleteAllMutate,
+    isPending: mockDeleteAllPending,
   }),
 }));
 
@@ -64,6 +67,8 @@ describe('SessionTable', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    mockDeleteAllMutate = vi.fn();
+    mockDeleteAllPending = false;
   });
 
   it('renders the table with Active Loops tab selected by default', () => {
@@ -463,6 +468,112 @@ describe('SessionTable', () => {
         fireEvent.click(confirmButton);
         expect(mockDeleteAll).toHaveBeenCalled();
       }
+    });
+
+    it('calls deleteAllMutation with onSuccess callback when confirming delete', async () => {
+      let successCallbackCalled = false;
+      mockDeleteAllMutate = vi.fn((_undefined, options) => {
+        if (options?.onSuccess) {
+          options.onSuccess();
+          successCallbackCalled = true;
+        }
+      });
+
+      const sessions: Session[] = [
+        createMockSession({ loop_id: 'loop-1', status: 'success' }),
+      ];
+      render(
+        <SessionTable
+          sessions={sessions}
+          viewMode="table"
+          setViewMode={mockSetViewMode}
+        />,
+        { wrapper: createWrapper() }
+      );
+
+      // Switch to archived tab
+      fireEvent.click(screen.getByText('Archived'));
+
+      // Click Delete All button
+      fireEvent.click(screen.getByText('Delete All'));
+
+      // Click confirm button
+      const confirmButton = screen
+        .getAllByText('Delete All')
+        .find((btn) => btn.getAttribute('class')?.includes('bg-red-600'));
+      if (confirmButton) {
+        fireEvent.click(confirmButton);
+        expect(mockDeleteAllMutate).toHaveBeenCalled();
+        expect(successCallbackCalled).toBe(true);
+        // Note: onSuccess closes modal, we verified mutate was called with onSuccess
+      }
+    });
+
+    it('shows error alert when deleteAllMutation fails', async () => {
+      const mockError = new Error('Delete failed');
+      mockDeleteAllMutate = vi.fn((_undefined, options) => {
+        if (options?.onError) {
+          options.onError(mockError);
+        }
+      });
+
+      // Mock alert
+      const alertSpy = vi.spyOn(window, 'alert').mockImplementation(() => {});
+
+      const sessions: Session[] = [
+        createMockSession({ loop_id: 'loop-1', status: 'success' }),
+      ];
+      render(
+        <SessionTable
+          sessions={sessions}
+          viewMode="table"
+          setViewMode={mockSetViewMode}
+        />,
+        { wrapper: createWrapper() }
+      );
+
+      // Switch to archived tab
+      fireEvent.click(screen.getByText('Archived'));
+
+      // Click Delete All button
+      fireEvent.click(screen.getByText('Delete All'));
+
+      // Click confirm button
+      const confirmButton = screen
+        .getAllByText('Delete All')
+        .find((btn) => btn.getAttribute('class')?.includes('bg-red-600'));
+      if (confirmButton) {
+        fireEvent.click(confirmButton);
+        expect(mockDeleteAllMutate).toHaveBeenCalled();
+        expect(alertSpy).toHaveBeenCalledWith(
+          'Failed to delete: Delete failed'
+        );
+      }
+
+      alertSpy.mockRestore();
+    });
+
+    it('disables Delete All button when deletion is pending', async () => {
+      mockDeleteAllPending = true;
+
+      const sessions: Session[] = [
+        createMockSession({ loop_id: 'loop-1', status: 'success' }),
+      ];
+      render(
+        <SessionTable
+          sessions={sessions}
+          viewMode="table"
+          setViewMode={mockSetViewMode}
+        />,
+        { wrapper: createWrapper() }
+      );
+
+      // Switch to archived tab
+      fireEvent.click(screen.getByText('Archived'));
+
+      const deleteButton = screen.getByText('Delete All');
+      expect(deleteButton).toBeDisabled();
+      expect(deleteButton.className).toContain('cursor-not-allowed');
     });
   });
 });

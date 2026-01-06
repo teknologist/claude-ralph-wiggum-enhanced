@@ -12,7 +12,7 @@ test.describe('Ralph Dashboard', () => {
     // Check footer is visible
     await expect(
       page.getByText(
-        'Ralph Dashboard - Part of the Ralph Wiggum plugin for Claude Code'
+        'Ralph Dashboard - Part of the Ralph Wiggum Pro plugin for Claude Code - Crafted with ❤️ in Biarritz'
       )
     ).toBeVisible();
   });

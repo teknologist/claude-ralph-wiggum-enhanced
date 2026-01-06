@@ -105,6 +105,30 @@ if [[ -n "${CLAUDE_ENV_FILE:-}" ]]; then
   debug_log "Set CLAUDE_SESSION_ID=$SESSION_ID in env file"
 fi
 
+# Clean up stale PID files from dead processes
+# This is more reliable than session-end-hook since processes can crash/kill -9
+cleanup_stale_pid_files() {
+  local max_files=100  # Limit cleanup scope
+  local count=0
+  for file in "$SESSIONS_DIR"/ppid_*.id; do
+    [[ -f "$file" ]] || continue
+    ((count++))
+    [[ $count -gt $max_files ]] && break
+
+    local pid="${file##*/ppid_}"
+    pid="${pid%.id}"
+    [[ "$pid" =~ ^[0-9]+$ ]] || continue
+
+    # Check if process is still running
+    if ! kill -0 "$pid" 2>/dev/null; then
+      rm -f "$file" 2>/dev/null && debug_log "Cleaned up stale PID file: $file"
+    fi
+  done
+}
+
+# Proactively clean up stale PID files
+cleanup_stale_pid_files
+
 # Write session ID to PPID-based file for cross-hook/command communication
 # This allows setup-ralph-loop.sh to get the correct session ID after /clear
 # PPID identifies the Claude Code process that spawned this hook
