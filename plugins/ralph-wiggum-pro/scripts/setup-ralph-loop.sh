@@ -365,22 +365,34 @@ debug_log "PPID=$PPID"
 
 SESSIONS_DIR="$RALPH_BASE_DIR/sessions"
 
-# Validate PPID is numeric before using it in file path
-if [[ ! "$PPID" =~ ^[0-9]+$ ]]; then
-  debug_log "WARNING: PPID is not numeric: $PPID - falling back to env var"
-  SESSION_ID="${CLAUDE_SESSION_ID:-}"
-else
-  SESSION_FILE="$SESSIONS_DIR/ppid_$PPID.id"
-  debug_log "Looking for session file: $SESSION_FILE"
+# Find session ID by walking up the process tree to find Claude Code
+# The hook writes to ppid_{CLAUDE_CODE_PID}.id, but this script's $PPID
+# is a shell subprocess, not Claude Code. We walk up until we find a match.
+find_session_from_process_tree() {
+  local current_pid=$$
+  local max_depth=10
+  local depth=0
 
-  if [[ -f "$SESSION_FILE" ]]; then
-    SESSION_ID=$(cat "$SESSION_FILE")
-    debug_log "Read session ID from PPID file: $SESSION_ID"
-  else
-    # Fallback to env var (for backwards compatibility or if hook hasn't run yet)
-    SESSION_ID="${CLAUDE_SESSION_ID:-}"
-    debug_log "WARNING: PPID file not found, falling back to env var: $SESSION_ID"
-  fi
+  while [[ $depth -lt $max_depth ]] && [[ "$current_pid" -gt 1 ]]; do
+    local session_file="$SESSIONS_DIR/ppid_$current_pid.id"
+    if [[ -f "$session_file" ]]; then
+      cat "$session_file"
+      return 0
+    fi
+    # Get parent PID (works on macOS and Linux)
+    current_pid=$(ps -o ppid= -p "$current_pid" 2>/dev/null | tr -d ' ')
+    [[ -z "$current_pid" ]] && break
+    ((depth++))
+  done
+  return 1
+}
+
+# Try process tree walk first, then env var fallback
+if SESSION_ID=$(find_session_from_process_tree); then
+  debug_log "Read session ID from process tree: $SESSION_ID"
+else
+  SESSION_ID="${CLAUDE_SESSION_ID:-}"
+  debug_log "WARNING: No PPID file in process tree, falling back to env var: $SESSION_ID"
 fi
 
 debug_log "Final SESSION_ID=$SESSION_ID"

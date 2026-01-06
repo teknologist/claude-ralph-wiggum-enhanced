@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.2.5] - 2026-01-06
+
+### Fixed
+- **PPID Mismatch in Session ID Tracking**: Fixed critical bug where loops after `/clear` failed to iterate
+  - Root cause: Hook's `$PPID` (Claude Code's PID) differs from script's `$PPID` (shell subprocess PID)
+  - `setup-ralph-loop.sh` looked for wrong PPID file, fell back to stale env var
+  - Fix: Walk up process tree until finding a PID with corresponding session file
+  - Now correctly finds Claude Code's PID regardless of shell layer depth
+
 ## [2.2.4] - 2026-01-06
 
 ### Fixed
