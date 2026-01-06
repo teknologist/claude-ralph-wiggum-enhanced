@@ -7,6 +7,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.2.0] - 2026-01-06
+
+### Changed
+- **Global Directory Consolidation**: All Ralph data now stored under `~/.claude/ralph-wiggum-pro/` with subdirectories:
+  - `loops/` - State files for active loops
+  - `logs/` - Session logs (sessions.jsonl, debug.log)
+  - `transcripts/` - Iteration and full transcript files
+- **State File Naming**: State files now named `ralph-loop.{session_id}.local.md` using session_id directly (no file iteration)
+- **Loop ID Format**: Changed from UUID to 5-character short ID for better readability and transcript file naming
+- **Active Loop Detection**: File existence = active loop (removed `active` field from frontmatter)
+- **Simplified Frontmatter**: Removed `active` field; presence of state file indicates active loop
+
+### Added
+- **SessionEnd Hook**: Automatic cleanup of state files when terminal closes (claude_session_end event)
+- **Force Flag**: `--force` option for `/ralph-loop` to auto-cancel existing loops without prompting
+- **cancel-ralph-loop.sh**: New standalone script for programmatic loop cancellation
+
+### Removed
+- **Backward Compatibility Code**: Removed fallback logic for old directory paths (`~/.claude/ralph-wiggum-pro-logs/`)
+- **Project-scoped State Files**: State files no longer stored in project `.claude/` directory
+
+### Security
+- **Path Validation**: Updated loop-manager.ts to validate state file paths against global loops directory
+
 ## [2.1.1] - 2026-01-05
 
 ### Added

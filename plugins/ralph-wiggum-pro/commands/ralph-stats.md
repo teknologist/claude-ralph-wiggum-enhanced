@@ -21,7 +21,7 @@ The user may provide arguments. Parse them:
 ## Execute Query
 
 ```!
-LOG_FILE="$HOME/.claude/ralph-wiggum-pro-logs/sessions.jsonl"
+LOG_FILE="$HOME/.claude/ralph-wiggum-pro/logs/sessions.jsonl"
 
 if [[ ! -f "$LOG_FILE" ]]; then
   echo "NO_LOG_FILE"
@@ -151,7 +151,7 @@ EXAMPLES:
   /ralph-stats --all --outcome error    # Show all error sessions
 
 LOG LOCATION:
-  ~/.claude/ralph-wiggum-pro-logs/sessions.jsonl
+  ~/.claude/ralph-wiggum-pro/logs/sessions.jsonl
 
 NOTE:
   The log uses a two-entry format:

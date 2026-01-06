@@ -1,6 +1,6 @@
 {
   "name": "ralph-dashboard",
-  "version": "2.1.1",
+  "version": "2.2.0",
   "description": "Web dashboard for Ralph Wiggum loops - view active and archived sessions",
   "type": "module",
   "bin": {

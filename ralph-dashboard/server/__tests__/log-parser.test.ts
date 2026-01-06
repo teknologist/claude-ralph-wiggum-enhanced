@@ -501,8 +501,10 @@ iteration: 5`;
       expect(result).toBeNull();
     });
 
-    it('returns null for incomplete frontmatter (missing active field)', () => {
-      const stateFile = join(testDir, 'incomplete.md');
+    it('returns iteration when frontmatter is valid (session_id present)', () => {
+      // With the new architecture, 'active' field is removed
+      // We only check for session_id as the required indicator
+      const stateFile = join(testDir, 'valid-new.md');
       const content = `---
 session_id: test-123
 iteration: 5
@@ -511,13 +513,12 @@ Content`;
       writeFileSync(stateFile, content);
 
       const result = readIterationFromStateFile(stateFile);
-      expect(result).toBeNull();
+      expect(result).toBe(5);
     });
 
     it('returns null for incomplete frontmatter (missing session_id field)', () => {
       const stateFile = join(testDir, 'incomplete2.md');
       const content = `---
-active: true
 iteration: 5
 ---
 Content`;
@@ -558,7 +559,7 @@ iteration: 5`;
     it('returns expected path format', () => {
       const path = getLogFilePath();
       expect(path).toContain('.claude');
-      expect(path).toContain('ralph-wiggum-pro-logs');
+      expect(path).toContain('ralph-wiggum-pro');
       expect(path).toContain('sessions.jsonl');
     });
   });

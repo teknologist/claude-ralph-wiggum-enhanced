@@ -6,9 +6,10 @@ hide-from-slash-command-tool: "true"
 
 # Cancel Ralph
 
-First, list all active Ralph loops in this project:
+First, list all active Ralph loops:
 
 ```!
+LOOPS_DIR="$HOME/.claude/ralph-wiggum-pro/loops"
 found=0
 # Use find to avoid shell glob expansion errors in zsh
 while IFS= read -r f; do
@@ -20,16 +21,18 @@ while IFS= read -r f; do
     ITER=$(grep '^iteration:' "$f" 2>/dev/null | sed 's/iteration: *//' || echo "?")
     MAX=$(grep '^max_iterations:' "$f" 2>/dev/null | sed 's/max_iterations: *//' || echo "0")
     STARTED=$(grep '^started_at:' "$f" 2>/dev/null | sed 's/started_at: *//' | sed 's/^"\(.*\)"$/\1/' || echo "unknown")
+    PROJECT=$(grep '^project:' "$f" 2>/dev/null | sed 's/project: *//' | sed 's/^"\(.*\)"$/\1/' || echo "unknown")
     echo "LOOP_FOUND"
     echo "SESSION=$SESSION"
     echo "DESC=$DESC"
     echo "ITER=$ITER"
     echo "MAX=$MAX"
     echo "STARTED=$STARTED"
+    echo "PROJECT=$PROJECT"
     echo "FILE=$f"
     echo "---"
   fi
-done < <(find .claude -maxdepth 1 -name 'ralph-loop.*.local.md' 2>/dev/null)
+done < <(find "$LOOPS_DIR" -maxdepth 1 -name 'ralph-loop.*.local.md' 2>/dev/null)
 if [[ $found -eq 0 ]]; then
   echo "NO_LOOPS_FOUND"
 fi
@@ -38,10 +41,10 @@ fi
 Based on the output above:
 
 ## If NO_LOOPS_FOUND
-Say: "No active Ralph loops found in this project."
+Say: "No active Ralph loops found."
 
 ## If exactly ONE loop found
-1. Show the loop details (session ID truncated to 8 chars, description, iteration count)
+1. Show the loop details (session ID truncated to 8 chars, description, iteration count, project)
 2. Use AskUserQuestion to confirm cancellation:
    ```
    {
@@ -60,7 +63,7 @@ Say: "No active Ralph loops found in this project."
 5. If not confirmed, say: "Loop not cancelled."
 
 ## If MULTIPLE loops found
-1. Show a summary of all loops with their session IDs (truncated) and descriptions
+1. Show a summary of all loops with their session IDs (truncated), descriptions, and projects
 2. Use AskUserQuestion to ask which loop(s) to cancel:
    - Create options based on the loops found, using format: "Session <id>: <description>"
    - Include an "All loops" option as first choice
@@ -78,8 +81,8 @@ Example AskUserQuestion format for multiple loops:
   "header": "Cancel loops",
   "options": [
     {"label": "All loops", "description": "Cancel all active Ralph loops"},
-    {"label": "abc12345: Build REST API...", "description": "Iteration 5, running since ..."},
-    {"label": "xyz78901: Fix auth bug...", "description": "Iteration 12, running since ..."},
+    {"label": "abc12345: Build REST API...", "description": "Iteration 5 in /Users/dev/my-project"},
+    {"label": "xyz78901: Fix auth bug...", "description": "Iteration 12 in /Users/dev/other-project"},
     {"label": "None - keep all running", "description": "Don't cancel any loops"}
   ],
   "multiSelect": true

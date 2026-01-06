@@ -2,6 +2,7 @@
 
 # Ralph Loop Setup Script
 # Creates session-specific state file for in-session Ralph loop
+# State file: ~/.claude/ralph-wiggum-pro/loops/ralph-loop.{session_id}.local.md
 
 set -euo pipefail
 
@@ -10,6 +11,7 @@ PROMPT_PARTS=()
 MAX_ITERATIONS=0
 COMPLETION_PROMISE="null"
 PROMPT_FILE=""
+FORCE_FLAG=false
 
 # Save original arguments for fallback detection (handles multi-line input edge cases)
 ORIGINAL_ARGS="$*"
@@ -32,6 +34,7 @@ OPTIONS:
   --prompt-file <file>           Read prompt from markdown file instead of inline
   --max-iterations <n>           Maximum iterations before auto-stop (default: unlimited)
   --completion-promise '<text>'  Promise phrase (USE QUOTES for multi-word)
+  --force                        Auto-cancel existing loop in this session and start fresh
   -h, --help                     Show this help message
 
 DESCRIPTION:
@@ -53,6 +56,7 @@ EXAMPLES:
   /ralph-loop --prompt-file ./tasks/api-task.md --max-iterations 50
   /ralph-loop --max-iterations 10 Fix the auth bug
   /ralph-loop Refactor cache layer  (runs forever)
+  /ralph-loop "New task" --force  (auto-cancel existing loop)
 
 STOPPING:
   Only by reaching --max-iterations or detecting --completion-promise
@@ -63,13 +67,17 @@ MONITORING:
   /list-ralph-loops
 
   # View your session's state:
-  cat .claude/ralph-loop.${CLAUDE_SESSION_ID}.local.md
+  cat ~/.claude/ralph-wiggum-pro/loops/ralph-loop.${CLAUDE_SESSION_ID}.local.md
 HELP_EOF
       exit 0
       ;;
+    --force|-f)
+      FORCE_FLAG=true
+      shift
+      ;;
     --prompt-file)
       if [[ -z "${2:-}" ]]; then
-        echo "❌ Error: --prompt-file requires a file path" >&2
+        echo "Error: --prompt-file requires a file path" >&2
         echo "" >&2
         echo "   Valid examples:" >&2
         echo "     --prompt-file ./tasks/my-task.md" >&2
@@ -77,7 +85,7 @@ HELP_EOF
         exit 1
       fi
       if [[ ! -f "$2" ]]; then
-        echo "❌ Error: Prompt file not found: $2" >&2
+        echo "Error: Prompt file not found: $2" >&2
         exit 1
       fi
       PROMPT_FILE="$2"
@@ -87,14 +95,14 @@ HELP_EOF
       # Handle --max-iterations=VALUE format
       MAX_ITERATIONS="${1#--max-iterations=}"
       if ! [[ "$MAX_ITERATIONS" =~ ^[0-9]+$ ]]; then
-        echo "❌ Error: --max-iterations must be a positive integer or 0, got: $MAX_ITERATIONS" >&2
+        echo "Error: --max-iterations must be a positive integer or 0, got: $MAX_ITERATIONS" >&2
         exit 1
       fi
       shift
       ;;
     --max-iterations)
       if [[ -z "${2:-}" ]]; then
-        echo "❌ Error: --max-iterations requires a number argument" >&2
+        echo "Error: --max-iterations requires a number argument" >&2
         echo "" >&2
         echo "   Valid examples:" >&2
         echo "     --max-iterations 10" >&2
@@ -105,7 +113,7 @@ HELP_EOF
         exit 1
       fi
       if ! [[ "$2" =~ ^[0-9]+$ ]]; then
-        echo "❌ Error: --max-iterations must be a positive integer or 0, got: $2" >&2
+        echo "Error: --max-iterations must be a positive integer or 0, got: $2" >&2
         echo "" >&2
         echo "   Valid examples:" >&2
         echo "     --max-iterations 10" >&2
@@ -130,7 +138,7 @@ HELP_EOF
       ;;
     --completion-promise)
       if [[ -z "${2:-}" ]]; then
-        echo "❌ Error: --completion-promise requires a text argument" >&2
+        echo "Error: --completion-promise requires a text argument" >&2
         echo "" >&2
         echo "   Valid examples:" >&2
         echo "     --completion-promise 'DONE'" >&2
@@ -173,7 +181,7 @@ fi
 
 # Validate prompt is non-empty
 if [[ -z "$PROMPT" ]]; then
-  echo "❌ Error: No prompt provided" >&2
+  echo "Error: No prompt provided" >&2
   echo "" >&2
   echo "   Ralph needs a task description to work on." >&2
   echo "" >&2
@@ -225,6 +233,11 @@ if [[ "$COMPLETION_PROMISE" == "null" ]]; then
     COMPLETION_PROMISE="${COMPLETION_PROMISE#\'}"
     COMPLETION_PROMISE="${COMPLETION_PROMISE%\'}"
   fi
+fi
+
+# Check for --force in original args
+if [[ "$ORIGINAL_ARGS" =~ --force ]] || [[ "$ORIGINAL_ARGS" =~ -f[[:space:]] ]]; then
+  FORCE_FLAG=true
 fi
 
 # Helper function to clean up whitespace in prompt text
@@ -305,54 +318,72 @@ if [[ "$PROMPT" =~ --completion-promise ]]; then
   PROMPT=$(_remove_option_from_prompt "$PROMPT" "--completion-promise")
 fi
 
+# Remove --force from prompt if present
+PROMPT=$(echo "$PROMPT" | sed -E 's/[[:space:]]*--force[[:space:]]*/ /g' | sed -E 's/[[:space:]]*-f[[:space:]]*/ /g')
+PROMPT=$(_cleanup_whitespace "$PROMPT")
+
 # Get session ID from environment (set by SessionStart hook via CLAUDE_ENV_FILE)
-SESSION_ID="${CLAUDE_SESSION_ID:-unknown}"
+SESSION_ID="${CLAUDE_SESSION_ID:-}"
 
-if [[ "$SESSION_ID" == "unknown" ]]; then
-  echo "⚠️  Warning: Session ID not available. Loop may not be session-isolated." >&2
-  echo "   This can happen if the plugin was just installed. Try restarting Claude Code." >&2
-  # Generate a fallback unique ID
-  SESSION_ID="fallback-$(date +%s)-$$"
-fi
-
-# Validate session ID format to prevent path traversal attacks
-# Allow UUIDs, alphanumeric with hyphens/underscores/dots (but not .. for path traversal)
-if [[ ! "$SESSION_ID" =~ ^[a-zA-Z0-9._-]+$ ]] || [[ "$SESSION_ID" == *".."* ]]; then
-  echo "❌ Error: Invalid session ID format (security check)" >&2
-  echo "   Session ID contains unsafe characters." >&2
-  echo "   This should not happen with normal Claude Code operation." >&2
+# FAIL LOUDLY: Session ID is required - no fallbacks
+if [[ -z "$SESSION_ID" ]]; then
+  echo "Error: CLAUDE_SESSION_ID not set" >&2
+  echo "" >&2
+  echo "   Ralph loops require a valid Claude Code session ID." >&2
+  echo "   This can happen if:" >&2
+  echo "     - The plugin was just installed (restart Claude Code)" >&2
+  echo "     - The SessionStart hook failed" >&2
+  echo "" >&2
+  echo "   Try: Restart Claude Code to reinitialize the session." >&2
   exit 1
 fi
 
-# Create .claude directory if needed
-mkdir -p .claude
+# Create global directories
+RALPH_BASE_DIR="$HOME/.claude/ralph-wiggum-pro"
+LOOPS_DIR="$RALPH_BASE_DIR/loops"
+LOGS_DIR="$RALPH_BASE_DIR/logs"
+TRANSCRIPTS_DIR="$RALPH_BASE_DIR/transcripts"
+mkdir -p "$LOOPS_DIR" "$LOGS_DIR" "$TRANSCRIPTS_DIR"
 
-# Check if a loop already exists for this session (prevents multiple concurrent loops)
-EXISTING_LOOP=""
-for STATE_FILE in .claude/ralph-loop.*.local.md; do
-  [[ -f "$STATE_FILE" ]] || continue
-  FILE_SESSION_ID=$(sed -n '/^---$/,/^---$/{ /^session_id:/{ s/session_id: *"\{0,1\}\([^"]*\)"\{0,1\}/\1/p; q; } }' "$STATE_FILE" 2>/dev/null || echo "")
-  if [[ "$FILE_SESSION_ID" == "$SESSION_ID" ]]; then
-    EXISTING_LOOP="$STATE_FILE"
-    break
+# State file path: one per session (keyed by session_id)
+STATE_FILE="$LOOPS_DIR/ralph-loop.${SESSION_ID}.local.md"
+
+# Check if a loop already exists for this session
+if [[ -f "$STATE_FILE" ]]; then
+  # Extract existing loop info
+  EXISTING_FRONTMATTER=$(sed -n '/^---$/,/^---$/{ /^---$/d; p; }' "$STATE_FILE")
+  EXISTING_DESCRIPTION=$(echo "$EXISTING_FRONTMATTER" | grep '^description:' | sed 's/description: *//' | sed 's/^"\(.*\)"$/\1/' || echo "")
+  EXISTING_ITERATION=$(echo "$EXISTING_FRONTMATTER" | grep '^iteration:' | sed 's/iteration: *//' || echo "?")
+  EXISTING_LOOP_ID=$(echo "$EXISTING_FRONTMATTER" | grep '^loop_id:' | sed 's/loop_id: *//' | sed 's/^"\(.*\)"$/\1/' || echo "")
+
+  if [[ "$FORCE_FLAG" == "true" ]]; then
+    # Auto-cancel the existing loop
+    echo "Cancelling existing loop: $EXISTING_DESCRIPTION (iteration $EXISTING_ITERATION)"
+
+    # Log cancellation
+    SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    "$SCRIPT_DIR/log-session.sh" "$STATE_FILE" "cancelled" "" 2>/dev/null || true
+
+    # Delete state file
+    rm -f "$STATE_FILE"
+    echo "Previous loop cancelled."
+    echo ""
+  else
+    # Fail with helpful message
+    echo "Error: A loop is already active in this session." >&2
+    echo "" >&2
+    echo "   Current: \"$EXISTING_DESCRIPTION\" (iteration $EXISTING_ITERATION)" >&2
+    echo "" >&2
+    echo "   Options:" >&2
+    echo "     - Cancel and start fresh: /ralph-loop \"new task\" --force" >&2
+    echo "     - Cancel manually: /cancel-ralph" >&2
+    echo "     - Continue existing: just keep working (exit will loop)" >&2
+    exit 1
   fi
-done
-
-if [[ -n "$EXISTING_LOOP" ]]; then
-  echo "Error: A Ralph loop is already active in this session!" >&2
-  echo "" >&2
-  echo "   State file: $EXISTING_LOOP" >&2
-  echo "   To restart the loop:" >&2
-  echo "     1. Cancel current loop: /cancel-ralph" >&2
-  echo "     2. Start new loop: /ralph-loop <prompt>" >&2
-  echo "" >&2
-  echo "   To continue existing loop: just keep working (exit will loop)" >&2
-  exit 1
 fi
 
-# Generate unique loop ID for this invocation (separate from session ID)
-# This allows multiple loops in the same session to have unique identifiers
-LOOP_ID="$(uuidgen 2>/dev/null | tr '[:upper:]' '[:lower:]' || cat /proc/sys/kernel/random/uuid 2>/dev/null || echo "loop-$(date +%s%N)-$$")"
+# Generate 5-char loop_id for transcript uniqueness
+LOOP_ID="$(head -c 5 /dev/urandom | xxd -p | head -c 5)"
 
 # Generate description from first 60 chars of prompt
 DESCRIPTION=$(echo "$PROMPT" | tr '\n' ' ' | head -c 60)
@@ -367,16 +398,14 @@ else
   COMPLETION_PROMISE_YAML="null"
 fi
 
-# Create loop-specific state file (using LOOP_ID for uniqueness)
-STATE_FILE=".claude/ralph-loop.${LOOP_ID}.local.md"
-STATE_FILE_PATH="$(pwd)/$STATE_FILE"
 PROJECT_PATH="$(pwd)"
 
+# Create state file (no 'active' field - file existence = active)
 cat > "$STATE_FILE" <<EOF
 ---
-active: true
-loop_id: "$LOOP_ID"
 session_id: "$SESSION_ID"
+loop_id: "$LOOP_ID"
+project: "$PROJECT_PATH"
 description: "$DESCRIPTION"
 iteration: 1
 max_iterations: $MAX_ITERATIONS
@@ -399,15 +428,15 @@ fi
   --session-id "$SESSION_ID" \
   --project "$PROJECT_PATH" \
   --task "$PROMPT" \
-  --state-file "$STATE_FILE_PATH" \
+  --state-file "$STATE_FILE" \
   --max-iterations "$MAX_ITERATIONS" \
   --completion-promise "$COMPLETION_PROMISE_LOG" 2>/dev/null || true
 
 # Output setup message
 cat <<EOF
-🔄 Ralph loop activated in this session!
+Ralph loop activated in this session!
 
-Loop ID: ${LOOP_ID:0:12}...
+Loop ID: $LOOP_ID
 Description: $DESCRIPTION
 Iteration: 1
 Max iterations: $(if [[ $MAX_ITERATIONS -gt 0 ]]; then echo $MAX_ITERATIONS; else echo "unlimited"; fi)
@@ -421,10 +450,9 @@ To monitor this loop: cat $STATE_FILE
 To list all loops:    /list-ralph-loops
 To cancel this loop:  /cancel-ralph
 
-⚠️  WARNING: This loop cannot be stopped manually! It will run infinitely
+WARNING: This loop cannot be stopped manually! It will run infinitely
     unless you set --max-iterations or --completion-promise.
 
-🔄
 EOF
 
 # Output the initial prompt if provided

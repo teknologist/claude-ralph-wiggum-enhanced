@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Ralph Wiggum Pro Session Logger
-# Logs session data to ~/.claude/ralph-wiggum-pro-logs/sessions.jsonl
+# Logs session data to ~/.claude/ralph-wiggum-pro/logs/sessions.jsonl
 #
 # Usage (start entry - new):
 #   log-session.sh --start --session-id ID --project PATH --task "TEXT" \
@@ -22,8 +22,9 @@ if ! command -v jq &>/dev/null; then
   exit 1
 fi
 
-# Ensure log directory exists
-LOG_DIR="$HOME/.claude/ralph-wiggum-pro-logs"
+# Global paths
+RALPH_BASE_DIR="$HOME/.claude/ralph-wiggum-pro"
+LOG_DIR="$RALPH_BASE_DIR/logs"
 LOG_FILE="$LOG_DIR/sessions.jsonl"
 mkdir -p "$LOG_DIR"
 
@@ -138,7 +139,7 @@ if [[ "${1:-}" == "--start" ]]; then
 
   cat "$TEMP_ENTRY" >> "$LOG_FILE"
 
-  echo "📝 Session started - logged to $LOG_FILE"
+  echo "Session started - logged to $LOG_FILE"
 
 else
   # === COMPLETION ENTRY MODE (existing behavior) ===
@@ -153,11 +154,11 @@ else
     exit 1
   fi
 
-  # Validate outcome
+  # Validate outcome (include 'abandoned' for SessionEnd hook)
   case "$OUTCOME" in
-    success|max_iterations|cancelled|error) ;;
+    success|max_iterations|cancelled|abandoned|error) ;;
     *)
-      echo "Invalid outcome: $OUTCOME (must be: success, max_iterations, cancelled, error)" >&2
+      echo "Invalid outcome: $OUTCOME (must be: success, max_iterations, cancelled, abandoned, error)" >&2
       exit 1
       ;;
   esac
@@ -223,15 +224,15 @@ else
 
   cat "$TEMP_ENTRY" >> "$LOG_FILE"
 
-  echo "📝 Session completed - logged to $LOG_FILE"
+  echo "Session completed - logged to $LOG_FILE"
 
   # Delete state file if --delete flag is passed
   if [[ "$DELETE_STATE_FILE" == "--delete" ]]; then
     rm -f "$STATE_FILE"
     if [[ ! -f "$STATE_FILE" ]]; then
-      echo "🗑️  State file deleted: $STATE_FILE"
+      echo "State file deleted: $STATE_FILE"
     else
-      echo "⚠️  Warning: State file may not have been deleted: $STATE_FILE" >&2
+      echo "Warning: State file may not have been deleted: $STATE_FILE" >&2
     fi
   fi
 fi

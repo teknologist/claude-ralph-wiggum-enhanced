@@ -1,6 +1,6 @@
 import { homedir } from 'os';
 import { join } from 'path';
-import { readFileSync, existsSync } from 'fs';
+import { readFileSync, existsSync, readdirSync } from 'fs';
 import type {
   Checklist,
   ChecklistItem,
@@ -8,7 +8,12 @@ import type {
   ChecklistItemStatus,
 } from '../types.js';
 
-const TRANSCRIPTS_DIR = join(
+// Global paths
+const RALPH_BASE_DIR = join(homedir(), '.claude', 'ralph-wiggum-pro');
+const TRANSCRIPTS_DIR = join(RALPH_BASE_DIR, 'transcripts');
+
+// Old path for backward compatibility
+const OLD_TRANSCRIPTS_DIR = join(
   homedir(),
   '.claude',
   'ralph-wiggum-pro-logs',
@@ -33,13 +38,42 @@ function validateLoopId(loopId: string): boolean {
 }
 
 /**
- * Get the file path for a checklist
+ * Find the checklist file path for a loop.
+ * Handles both new naming ({session_id}-{loop_id}-checklist.json) and
+ * old naming ({loop_id}-checklist.json).
  */
-function getChecklistPath(loopId: string): string {
+function getChecklistPath(loopId: string): string | null {
   if (!validateLoopId(loopId)) {
     throw new Error(`Invalid loop_id format: ${loopId}`);
   }
-  return join(TRANSCRIPTS_DIR, `${loopId}-checklist.json`);
+
+  // Try new directory with glob pattern
+  if (existsSync(TRANSCRIPTS_DIR)) {
+    const files = readdirSync(TRANSCRIPTS_DIR);
+    const match = files.find(
+      (f) =>
+        f.endsWith(`-${loopId}-checklist.json`) ||
+        f === `${loopId}-checklist.json`
+    );
+    if (match) {
+      return join(TRANSCRIPTS_DIR, match);
+    }
+  }
+
+  // Try old directory (backward compatibility)
+  if (existsSync(OLD_TRANSCRIPTS_DIR)) {
+    const files = readdirSync(OLD_TRANSCRIPTS_DIR);
+    const match = files.find(
+      (f) =>
+        f.endsWith(`-${loopId}-checklist.json`) ||
+        f === `${loopId}-checklist.json`
+    );
+    if (match) {
+      return join(OLD_TRANSCRIPTS_DIR, match);
+    }
+  }
+
+  return null;
 }
 
 /**
@@ -48,7 +82,7 @@ function getChecklistPath(loopId: string): string {
 export function hasChecklist(loopId: string): boolean {
   try {
     const path = getChecklistPath(loopId);
-    return existsSync(path);
+    return path !== null && existsSync(path);
   } catch {
     return false;
   }
@@ -61,7 +95,7 @@ export function getChecklist(loopId: string): Checklist | null {
   try {
     const path = getChecklistPath(loopId);
 
-    if (!existsSync(path)) {
+    if (!path || !existsSync(path)) {
       return null;
     }
 

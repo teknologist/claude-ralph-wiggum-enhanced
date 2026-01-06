@@ -1,12 +1,24 @@
 import { watch, type FSWatcher } from 'fs';
-import { openSync, readSync, fstatSync, closeSync, existsSync } from 'fs';
+import {
+  openSync,
+  readSync,
+  fstatSync,
+  closeSync,
+  existsSync,
+  readdirSync,
+} from 'fs';
 import { homedir } from 'os';
-import { join, dirname } from 'path';
+import { join } from 'path';
 import type { ServerWebSocket } from 'bun';
 import type { IterationEntry } from './transcript-service';
 import type { WebSocketData } from '../types';
 
-const TRANSCRIPT_DIR = join(
+// Global paths
+const RALPH_BASE_DIR = join(homedir(), '.claude', 'ralph-wiggum-pro');
+const TRANSCRIPT_DIR = join(RALPH_BASE_DIR, 'transcripts');
+
+// Old path for backward compatibility
+const OLD_TRANSCRIPT_DIR = join(
   homedir(),
   '.claude',
   'ralph-wiggum-pro-logs',
@@ -19,6 +31,7 @@ interface FileWatchState {
   debounceTimer: ReturnType<typeof setTimeout> | null;
   clients: Set<ServerWebSocket<WebSocketData>>;
   watchingDirectory: boolean; // Track if we're watching parent dir for file creation
+  filePath: string | null; // Store resolved file path
 }
 
 // Track active watchers by loopId
@@ -31,10 +44,53 @@ const DEBOUNCE_MS = 100;
 const MAX_SUBSCRIPTIONS_PER_CLIENT = 10;
 
 /**
- * Get the iterations file path for a loop.
+ * Find the iterations file path for a loop.
+ * Handles both new naming ({session_id}-{loop_id}-iterations.jsonl) and
+ * old naming ({loop_id}-iterations.jsonl).
  */
-function getIterationsFilePath(loopId: string): string {
-  return join(TRANSCRIPT_DIR, `${loopId}-iterations.jsonl`);
+function findIterationsFilePath(loopId: string): string | null {
+  // Try new directory with glob pattern
+  if (existsSync(TRANSCRIPT_DIR)) {
+    const files = readdirSync(TRANSCRIPT_DIR);
+    const match = files.find(
+      (f) =>
+        f.endsWith(`-${loopId}-iterations.jsonl`) ||
+        f === `${loopId}-iterations.jsonl`
+    );
+    if (match) {
+      return join(TRANSCRIPT_DIR, match);
+    }
+  }
+
+  // Try old directory (backward compatibility)
+  if (existsSync(OLD_TRANSCRIPT_DIR)) {
+    const files = readdirSync(OLD_TRANSCRIPT_DIR);
+    const match = files.find(
+      (f) =>
+        f.endsWith(`-${loopId}-iterations.jsonl`) ||
+        f === `${loopId}-iterations.jsonl`
+    );
+    if (match) {
+      return join(OLD_TRANSCRIPT_DIR, match);
+    }
+  }
+
+  return null;
+}
+
+/**
+ * Get the expected iterations file pattern for watching.
+ * Returns the directory and pattern suffix to watch for.
+ */
+function getIterationsWatchTarget(loopId: string): {
+  dir: string;
+  suffix: string;
+} {
+  // Prefer new directory
+  return {
+    dir: TRANSCRIPT_DIR,
+    suffix: `-${loopId}-iterations.jsonl`,
+  };
 }
 
 /**
@@ -152,22 +208,23 @@ function handleFileChange(loopId: string, filePath: string): void {
  */
 function handleDirectoryChange(
   loopId: string,
-  filePath: string,
+  targetSuffix: string,
   filename: string | null
 ): void {
   const state = watchers.get(loopId);
   if (!state || !state.watchingDirectory) return;
 
-  const targetFilename = `${loopId}-iterations.jsonl`;
+  // Check if the target file was created (matches suffix pattern)
+  if (filename && filename.endsWith(targetSuffix)) {
+    const filePath = join(TRANSCRIPT_DIR, filename);
 
-  // Check if the target file was created
-  if (filename === targetFilename || existsSync(filePath)) {
     // Switch from directory watching to file watching
     if (state.watcher) {
       state.watcher.close();
     }
 
     state.watchingDirectory = false;
+    state.filePath = filePath;
     state.watcher = watch(filePath, { persistent: false }, (eventType) => {
       if (eventType === 'change') {
         handleFileChange(loopId, filePath);
@@ -225,8 +282,6 @@ export function subscribeToLoop(
     };
   }
 
-  const filePath = getIterationsFilePath(loopId);
-
   let state = watchers.get(loopId);
 
   if (!state) {
@@ -234,8 +289,12 @@ export function subscribeToLoop(
     let lastSize = 0;
     let watcher: FSWatcher | null = null;
     let watchingDirectory = false;
+    let filePath: string | null = null;
 
-    if (existsSync(filePath)) {
+    // Try to find existing file
+    filePath = findIterationsFilePath(loopId);
+
+    if (filePath && existsSync(filePath)) {
       // File exists - watch the file directly
       try {
         const fd = openSync(filePath, 'r');
@@ -248,7 +307,7 @@ export function subscribeToLoop(
 
       watcher = watch(filePath, { persistent: false }, (eventType) => {
         if (eventType === 'change') {
-          handleFileChange(loopId, filePath);
+          handleFileChange(loopId, filePath!);
         }
       });
 
@@ -258,24 +317,26 @@ export function subscribeToLoop(
 
       console.log(`Started file watcher for loop: ${loopId}`);
     } else {
-      // File doesn't exist yet - watch the parent directory for file creation
-      const dirPath = dirname(filePath);
+      // File doesn't exist yet - watch the directory for file creation
+      const { dir, suffix } = getIterationsWatchTarget(loopId);
 
-      if (existsSync(dirPath)) {
+      // Ensure directory exists
+      if (!existsSync(dir)) {
+        try {
+          const fs = require('fs');
+          fs.mkdirSync(dir, { recursive: true });
+        } catch {
+          // Ignore - directory may have been created by another process
+        }
+      }
+
+      if (existsSync(dir)) {
         watchingDirectory = true;
-        watcher = watch(
-          dirPath,
-          { persistent: false },
-          (eventType, filename) => {
-            if (eventType === 'rename') {
-              handleDirectoryChange(
-                loopId,
-                filePath,
-                filename as string | null
-              );
-            }
+        watcher = watch(dir, { persistent: false }, (eventType, filename) => {
+          if (eventType === 'rename') {
+            handleDirectoryChange(loopId, suffix, filename as string | null);
           }
-        );
+        });
 
         watcher.on('error', (error) => {
           console.error(`Directory watcher error for ${loopId}:`, error);
@@ -297,6 +358,7 @@ export function subscribeToLoop(
       debounceTimer: null,
       clients: new Set(),
       watchingDirectory,
+      filePath,
     };
 
     watchers.set(loopId, state);

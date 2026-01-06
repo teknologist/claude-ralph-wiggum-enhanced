@@ -1,5 +1,6 @@
 import { existsSync, unlinkSync, appendFileSync } from 'fs';
-import { resolve } from 'path';
+import { homedir } from 'os';
+import { join, resolve } from 'path';
 import type { Session } from '../types';
 import { getLogFilePath } from './log-parser';
 
@@ -8,23 +9,20 @@ export interface CancelResult {
   message: string;
 }
 
-/**
- * Validate that the state file path is within the expected project directory.
- * This prevents deletion of files outside the project's .claude directory.
- */
-function validateStateFilePath(
-  stateFilePath: string,
-  session: Session
-): boolean {
-  if (!session.project) {
-    return false;
-  }
+// Global paths
+const RALPH_BASE_DIR = join(homedir(), '.claude', 'ralph-wiggum-pro');
+const LOOPS_DIR = join(RALPH_BASE_DIR, 'loops');
 
+/**
+ * Validate that the state file path is within the expected loops directory.
+ * This prevents deletion of files outside the loops directory.
+ */
+function validateStateFilePath(stateFilePath: string): boolean {
   try {
     const resolvedPath = resolve(stateFilePath);
-    const expectedBase = resolve(session.project, '.claude');
+    const expectedBase = resolve(LOOPS_DIR);
 
-    // Ensure the state file is within the project's .claude directory
+    // Ensure the state file is within the global loops directory
     return resolvedPath.startsWith(expectedBase);
   } catch {
     return false;
@@ -49,7 +47,7 @@ export function cancelLoop(session: Session): CancelResult {
   }
 
   // Validate the state file path is within expected bounds
-  if (!validateStateFilePath(stateFilePath, session)) {
+  if (!validateStateFilePath(stateFilePath)) {
     return {
       success: false,
       message: `Invalid state file path for loop ${session.loop_id}`,

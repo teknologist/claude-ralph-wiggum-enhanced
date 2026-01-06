@@ -6,9 +6,10 @@ hide-from-slash-command-tool: "true"
 
 # List Ralph Loops
 
-List all active Ralph loops in this project:
+List all active Ralph loops:
 
 ```!
+LOOPS_DIR="$HOME/.claude/ralph-wiggum-pro/loops"
 found=0
 # Use find to avoid shell glob expansion errors when no files exist
 while IFS= read -r f; do
@@ -20,6 +21,8 @@ while IFS= read -r f; do
     ITER=$(grep '^iteration:' "$f" 2>/dev/null | sed 's/iteration: *//' || echo "?")
     MAX=$(grep '^max_iterations:' "$f" 2>/dev/null | sed 's/max_iterations: *//' || echo "0")
     STARTED=$(grep '^started_at:' "$f" 2>/dev/null | sed 's/started_at: *//' | sed 's/^"\(.*\)"$/\1/' || echo "unknown")
+    PROJECT=$(grep '^project:' "$f" 2>/dev/null | sed 's/project: *//' | sed 's/^"\(.*\)"$/\1/' || echo "unknown")
+    LOOP_ID=$(grep '^loop_id:' "$f" 2>/dev/null | sed 's/loop_id: *//' | sed 's/^"\(.*\)"$/\1/' || echo "?")
 
     # Calculate elapsed time
     if [[ "$STARTED" != "unknown" ]]; then
@@ -43,14 +46,16 @@ while IFS= read -r f; do
 
     echo "LOOP_FOUND"
     echo "SESSION=$SESSION"
+    echo "LOOP_ID=$LOOP_ID"
     echo "DESC=$DESC"
     echo "ITER=$ITER"
     echo "MAX=$MAX"
     echo "ELAPSED=$ELAPSED"
+    echo "PROJECT=$PROJECT"
     echo "FILE=$f"
     echo "---"
   fi
-done < <(find .claude -maxdepth 1 -name 'ralph-loop.*.local.md' 2>/dev/null)
+done < <(find "$LOOPS_DIR" -maxdepth 1 -name 'ralph-loop.*.local.md' 2>/dev/null)
 if [[ $found -eq 0 ]]; then
   echo "NO_LOOPS_FOUND"
 fi
@@ -59,30 +64,30 @@ fi
 Based on the output above, format and display the results:
 
 ## If NO_LOOPS_FOUND
-Say: "No active Ralph loops found in this project."
+Say: "No active Ralph loops found."
 
 ## If loops are found
 Display them in a clear table format:
 
 ```
-📋 Active Ralph Loops
-═══════════════════════════════════════════════════════════════
+Active Ralph Loops
 
 Session: <first 8 chars of SESSION>...
+Loop ID: <LOOP_ID>
 Task:    <DESC>
-Status:  Iteration <ITER>/<MAX or "∞"> | Running for <ELAPSED>
+Status:  Iteration <ITER>/<MAX or "unlimited"> | Running for <ELAPSED>
+Project: <PROJECT>
 File:    <FILE>
 
-───────────────────────────────────────────────────────────────
+---
 
 Session: <next session>
 ...
 
-═══════════════════════════════════════════════════════════════
 Total: <N> active loop(s)
 ```
 
-Show iteration as "5/20" if MAX > 0, or "5/∞" if MAX is 0 (unlimited).
+Show iteration as "5/20" if MAX > 0, or "5/unlimited" if MAX is 0 (unlimited).
 
 After displaying, remind the user:
 - To cancel a loop: `/cancel-ralph`

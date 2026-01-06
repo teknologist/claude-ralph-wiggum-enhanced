@@ -1,12 +1,8 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import * as fs from 'fs';
-import * as os from 'os';
-import * as path from 'path';
 
 // Mock the fs module
 vi.mock('fs');
-vi.mock('os');
-vi.mock('path');
 
 // Import after mocking
 import {
@@ -20,14 +16,8 @@ import {
 } from '../services/transcript-service';
 
 describe('transcript-service', () => {
-  const mockHomedir = '/home/testuser';
-
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.mocked(os.homedir).mockReturnValue(mockHomedir);
-    vi.mocked(path.join).mockImplementation((...args: string[]) =>
-      args.join('/')
-    );
   });
 
   afterEach(() => {
@@ -35,22 +25,75 @@ describe('transcript-service', () => {
   });
 
   describe('getIterationsFilePath', () => {
-    it('returns correct path for loop ID', () => {
+    it('returns correct path for loop ID when file exists in new directory', () => {
+      // Mock directory exists and contains matching file
+      vi.mocked(fs.existsSync).mockReturnValue(true);
+      // readdirSync returns filenames as strings
+      vi.mocked(fs.readdirSync).mockReturnValue([
+        'session123-loop-123-iterations.jsonl',
+        'other-file.txt',
+      ] as unknown as ReturnType<typeof fs.readdirSync>);
+
+      const result = getIterationsFilePath('loop-123');
+      expect(result).toContain('session123-loop-123-iterations.jsonl');
+    });
+
+    it('returns correct path for old naming format', () => {
+      vi.mocked(fs.existsSync).mockReturnValue(true);
+      vi.mocked(fs.readdirSync).mockReturnValue([
+        'loop-123-iterations.jsonl',
+      ] as unknown as ReturnType<typeof fs.readdirSync>);
+
       const result = getIterationsFilePath('loop-123');
       expect(result).toContain('loop-123-iterations.jsonl');
+    });
+
+    it('falls back to old directory when file not in new directory', () => {
+      let callCount = 0;
+      vi.mocked(fs.existsSync).mockReturnValue(true);
+      vi.mocked(fs.readdirSync).mockImplementation(() => {
+        callCount++;
+        // First call (new dir) returns empty, second call (old dir) returns file
+        if (callCount === 1)
+          return [] as unknown as ReturnType<typeof fs.readdirSync>;
+        return ['loop-123-iterations.jsonl'] as unknown as ReturnType<
+          typeof fs.readdirSync
+        >;
+      });
+
+      const result = getIterationsFilePath('loop-123');
+      expect(result).toContain('loop-123-iterations.jsonl');
+    });
+
+    it('returns null when file not found in either directory', () => {
+      vi.mocked(fs.existsSync).mockReturnValue(true);
+      vi.mocked(fs.readdirSync).mockReturnValue(
+        [] as unknown as ReturnType<typeof fs.readdirSync>
+      );
+
+      const result = getIterationsFilePath('non-existent');
+      expect(result).toBeNull();
     });
   });
 
   describe('getFullTranscriptFilePath', () => {
     it('returns correct path for loop ID', () => {
+      vi.mocked(fs.existsSync).mockReturnValue(true);
+      vi.mocked(fs.readdirSync).mockReturnValue([
+        'session123-loop-456-full.jsonl',
+      ] as unknown as ReturnType<typeof fs.readdirSync>);
+
       const result = getFullTranscriptFilePath('loop-456');
-      expect(result).toContain('loop-456-full.jsonl');
+      expect(result).toContain('session123-loop-456-full.jsonl');
     });
   });
 
   describe('hasIterations', () => {
     it('returns true when file exists', () => {
       vi.mocked(fs.existsSync).mockReturnValue(true);
+      vi.mocked(fs.readdirSync).mockReturnValue([
+        'session-loop-123-iterations.jsonl',
+      ] as unknown as ReturnType<typeof fs.readdirSync>);
       expect(hasIterations('loop-123')).toBe(true);
     });
 
@@ -63,6 +106,9 @@ describe('transcript-service', () => {
   describe('hasFullTranscript', () => {
     it('returns true when file exists', () => {
       vi.mocked(fs.existsSync).mockReturnValue(true);
+      vi.mocked(fs.readdirSync).mockReturnValue([
+        'session-loop-123-full.jsonl',
+      ] as unknown as ReturnType<typeof fs.readdirSync>);
       expect(hasFullTranscript('loop-123')).toBe(true);
     });
 
@@ -80,6 +126,9 @@ describe('transcript-service', () => {
 
     it('returns parsed iterations when file exists', () => {
       vi.mocked(fs.existsSync).mockReturnValue(true);
+      vi.mocked(fs.readdirSync).mockReturnValue([
+        'session-loop-123-iterations.jsonl',
+      ] as unknown as ReturnType<typeof fs.readdirSync>);
       const jsonlContent = [
         '{"iteration": 1, "timestamp": "2024-01-15T10:00:00Z", "output": "First output"}',
         '{"iteration": 2, "timestamp": "2024-01-15T10:30:00Z", "output": "Second output"}',
@@ -103,6 +152,9 @@ describe('transcript-service', () => {
 
     it('skips malformed lines', () => {
       vi.mocked(fs.existsSync).mockReturnValue(true);
+      vi.mocked(fs.readdirSync).mockReturnValue([
+        'session-loop-123-iterations.jsonl',
+      ] as unknown as ReturnType<typeof fs.readdirSync>);
       const jsonlContent = [
         '{"iteration": 1, "timestamp": "2024-01-15T10:00:00Z", "output": "First output"}',
         'not valid json',
@@ -123,15 +175,23 @@ describe('transcript-service', () => {
 
     it('returns null on read error', () => {
       vi.mocked(fs.existsSync).mockReturnValue(true);
+      vi.mocked(fs.readdirSync).mockReturnValue([
+        'session-loop-123-iterations.jsonl',
+      ] as unknown as ReturnType<typeof fs.readdirSync>);
       vi.mocked(fs.readFileSync).mockImplementation(() => {
         throw new Error('Read error');
       });
 
+      const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
       expect(getIterations('loop-123')).toBeNull();
+      errorSpy.mockRestore();
     });
 
     it('handles empty lines', () => {
       vi.mocked(fs.existsSync).mockReturnValue(true);
+      vi.mocked(fs.readdirSync).mockReturnValue([
+        'session-loop-123-iterations.jsonl',
+      ] as unknown as ReturnType<typeof fs.readdirSync>);
       const jsonlContent = [
         '{"iteration": 1, "timestamp": "2024-01-15T10:00:00Z", "output": "First output"}',
         '',
@@ -153,6 +213,9 @@ describe('transcript-service', () => {
 
     it('returns parsed messages when file exists', () => {
       vi.mocked(fs.existsSync).mockReturnValue(true);
+      vi.mocked(fs.readdirSync).mockReturnValue([
+        'session-loop-123-full.jsonl',
+      ] as unknown as ReturnType<typeof fs.readdirSync>);
       const jsonlContent = [
         '{"message": {"role": "user", "content": [{"type": "text", "text": "Hello"}]}}',
         '{"message": {"role": "assistant", "content": [{"type": "text", "text": "Hi there!"}]}}',
@@ -168,6 +231,9 @@ describe('transcript-service', () => {
 
     it('joins multiple text content blocks', () => {
       vi.mocked(fs.existsSync).mockReturnValue(true);
+      vi.mocked(fs.readdirSync).mockReturnValue([
+        'session-loop-123-full.jsonl',
+      ] as unknown as ReturnType<typeof fs.readdirSync>);
       const jsonlContent =
         '{"message": {"role": "assistant", "content": [{"type": "text", "text": "First part"}, {"type": "text", "text": "Second part"}]}}';
       vi.mocked(fs.readFileSync).mockReturnValue(jsonlContent);
@@ -180,6 +246,9 @@ describe('transcript-service', () => {
 
     it('filters out non-text content', () => {
       vi.mocked(fs.existsSync).mockReturnValue(true);
+      vi.mocked(fs.readdirSync).mockReturnValue([
+        'session-loop-123-full.jsonl',
+      ] as unknown as ReturnType<typeof fs.readdirSync>);
       const jsonlContent =
         '{"message": {"role": "assistant", "content": [{"type": "tool_use", "name": "test"}, {"type": "text", "text": "Result"}]}}';
       vi.mocked(fs.readFileSync).mockReturnValue(jsonlContent);
@@ -192,6 +261,9 @@ describe('transcript-service', () => {
 
     it('skips entries without text content', () => {
       vi.mocked(fs.existsSync).mockReturnValue(true);
+      vi.mocked(fs.readdirSync).mockReturnValue([
+        'session-loop-123-full.jsonl',
+      ] as unknown as ReturnType<typeof fs.readdirSync>);
       const jsonlContent = [
         '{"message": {"role": "assistant", "content": [{"type": "tool_use", "name": "test"}]}}',
         '{"message": {"role": "user", "content": [{"type": "text", "text": "Hello"}]}}',
@@ -206,6 +278,9 @@ describe('transcript-service', () => {
 
     it('skips entries without message or content', () => {
       vi.mocked(fs.existsSync).mockReturnValue(true);
+      vi.mocked(fs.readdirSync).mockReturnValue([
+        'session-loop-123-full.jsonl',
+      ] as unknown as ReturnType<typeof fs.readdirSync>);
       const jsonlContent = [
         '{"other": "data"}',
         '{"message": {}}',
@@ -221,24 +296,34 @@ describe('transcript-service', () => {
 
     it('skips malformed JSON lines', () => {
       vi.mocked(fs.existsSync).mockReturnValue(true);
+      vi.mocked(fs.readdirSync).mockReturnValue([
+        'session-loop-123-full.jsonl',
+      ] as unknown as ReturnType<typeof fs.readdirSync>);
       const jsonlContent = [
         'not json',
         '{"message": {"role": "user", "content": [{"type": "text", "text": "Hello"}]}}',
       ].join('\n');
       vi.mocked(fs.readFileSync).mockReturnValue(jsonlContent);
 
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
       const result = getFullTranscript('loop-123');
 
       expect(result).toHaveLength(1);
+      warnSpy.mockRestore();
     });
 
     it('returns null on read error', () => {
       vi.mocked(fs.existsSync).mockReturnValue(true);
+      vi.mocked(fs.readdirSync).mockReturnValue([
+        'session-loop-123-full.jsonl',
+      ] as unknown as ReturnType<typeof fs.readdirSync>);
       vi.mocked(fs.readFileSync).mockImplementation(() => {
         throw new Error('Read error');
       });
 
+      const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
       expect(getFullTranscript('loop-123')).toBeNull();
+      errorSpy.mockRestore();
     });
   });
 
@@ -250,6 +335,9 @@ describe('transcript-service', () => {
 
     it('returns raw content when file exists', () => {
       vi.mocked(fs.existsSync).mockReturnValue(true);
+      vi.mocked(fs.readdirSync).mockReturnValue([
+        'session-loop-123-full.jsonl',
+      ] as unknown as ReturnType<typeof fs.readdirSync>);
       const rawContent = '{"line": 1}\n{"line": 2}';
       vi.mocked(fs.readFileSync).mockReturnValue(rawContent);
 
@@ -258,11 +346,16 @@ describe('transcript-service', () => {
 
     it('returns null on read error', () => {
       vi.mocked(fs.existsSync).mockReturnValue(true);
+      vi.mocked(fs.readdirSync).mockReturnValue([
+        'session-loop-123-full.jsonl',
+      ] as unknown as ReturnType<typeof fs.readdirSync>);
       vi.mocked(fs.readFileSync).mockImplementation(() => {
         throw new Error('Read error');
       });
 
+      const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
       expect(getRawFullTranscript('loop-123')).toBeNull();
+      errorSpy.mockRestore();
     });
   });
 });

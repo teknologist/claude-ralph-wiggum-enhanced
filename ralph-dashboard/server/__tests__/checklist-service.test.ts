@@ -20,6 +20,8 @@ const mockExistsSync = vi.mocked(fs.existsSync);
 const mockReadFileSync = vi.mocked(fs.readFileSync);
 const mockJoin = vi.mocked(join);
 
+const mockReaddirSync = vi.mocked(fs.readdirSync);
+
 describe('checklist-service', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -38,6 +40,10 @@ describe('checklist-service', () => {
   describe('hasChecklist', () => {
     it('returns true when checklist file exists', () => {
       mockExistsSync.mockReturnValue(true);
+      // Mock readdirSync to return matching file
+      mockReaddirSync.mockReturnValue([
+        'session-valid-loop-id-checklist.json',
+      ] as unknown as ReturnType<typeof fs.readdirSync>);
       const result = hasChecklist('valid-loop-id');
       expect(result).toBe(true);
       expect(mockExistsSync).toHaveBeenCalled();
@@ -139,6 +145,9 @@ describe('checklist-service', () => {
 
     it('returns parsed checklist when file exists', () => {
       mockExistsSync.mockReturnValue(true);
+      mockReaddirSync.mockReturnValue([
+        'session-valid-loop-id-checklist.json',
+      ] as unknown as ReturnType<typeof fs.readdirSync>);
       mockReadFileSync.mockReturnValue(JSON.stringify(validChecklist));
       const result = getChecklist('valid-loop-id');
       expect(result).toEqual(validChecklist);
@@ -383,6 +392,9 @@ describe('checklist-service', () => {
 
     it('returns checklist with progress when file exists', () => {
       mockExistsSync.mockReturnValue(true);
+      mockReaddirSync.mockReturnValue([
+        'session-valid-loop-id-checklist.json',
+      ] as unknown as ReturnType<typeof fs.readdirSync>);
       mockReadFileSync.mockReturnValue(JSON.stringify(validChecklist));
       const result = getChecklistWithProgress('valid-loop-id');
       expect(result.checklist).toEqual(validChecklist);

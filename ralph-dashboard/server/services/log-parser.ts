@@ -15,12 +15,10 @@ import type {
 } from '../types';
 import { getChecklistWithProgress } from './checklist-service.js';
 
-const LOG_FILE = join(
-  homedir(),
-  '.claude',
-  'ralph-wiggum-pro-logs',
-  'sessions.jsonl'
-);
+// Global paths
+const RALPH_BASE_DIR = join(homedir(), '.claude', 'ralph-wiggum-pro');
+const LOGS_DIR = join(RALPH_BASE_DIR, 'logs');
+const LOG_FILE = join(LOGS_DIR, 'sessions.jsonl');
 
 /**
  * Extract --completion-promise=XXX from task text.
@@ -70,10 +68,8 @@ function parseIterationFromContent(content: string): number | null {
   const frontmatter = frontmatterMatch[1];
 
   // Validate frontmatter has required fields (indicates complete write)
-  if (
-    !frontmatter.includes('active:') ||
-    !frontmatter.includes('session_id:')
-  ) {
+  // Note: 'active' field removed in new architecture - check for session_id instead
+  if (!frontmatter.includes('session_id:')) {
     return null; // Incomplete/corrupted frontmatter
   }
 

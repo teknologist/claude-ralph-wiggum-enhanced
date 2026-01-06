@@ -1,45 +1,40 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { Session } from '../types';
 import * as fs from 'fs';
-import * as path from 'path';
+import { homedir } from 'os';
+import { join } from 'path';
 
 // We need to import after mocking
 vi.mock('fs');
-vi.mock('path');
 
 const mockExistsSync = vi.mocked(fs.existsSync);
 const mockUnlinkSync = vi.mocked(fs.unlinkSync);
-const mockResolve = vi.mocked(path.resolve);
+const mockAppendFileSync = vi.mocked(fs.appendFileSync);
 
 // Import the module after mocking
 const { cancelLoop, checkStateFileExists } =
   await import('../services/loop-manager');
 
 describe('loop-manager', () => {
+  // Use real homedir so path validation works correctly
+  const realHomedir = homedir();
+  const loopsDir = join(realHomedir, '.claude', 'ralph-wiggum-pro', 'loops');
+
   beforeEach(() => {
     vi.clearAllMocks();
-    // Set up default mock behavior for resolve - return simple paths
-    // First arg is usually the base path, subsequent args are joined
-    mockResolve.mockImplementation((...args: string[]) => {
-      // Simple implementation: join all non-empty args with /
-      const filtered = args.filter(
-        (a) => a !== undefined && a !== null && a !== ''
-      );
-      if (filtered.length === 0) return '/';
-      if (filtered.length === 1) return filtered[0];
-      return filtered.join('/');
-    });
+    // Mock appendFileSync for log writing
+    mockAppendFileSync.mockImplementation(() => undefined);
   });
 
   describe('cancelLoop', () => {
+    // Use a state file path that's in the global loops directory
     const activeSession: Session = {
       loop_id: 'loop-test-123',
       session_id: 'test-123',
       status: 'active',
       project: '/Users/test/project',
       project_name: 'project',
-      state_file_path:
-        '/Users/test/project/.claude/ralph-loop.test-123.local.md',
+      state_file_path: join(loopsDir, 'ralph-loop.test-123.local.md'),
       task: 'Test task',
       started_at: '2024-01-15T10:00:00Z',
       ended_at: null,
@@ -111,41 +106,31 @@ describe('loop-manager', () => {
       expect(result.message).toContain('Failed to cancel loop');
     });
 
-    it('should fail when state file path validation fails (no project)', () => {
-      const sessionNoProject: Session = {
+    it('should fail when state file path is outside global loops directory', () => {
+      // State file in project directory (old style) should fail validation
+      const sessionOldPath: Session = {
         ...activeSession,
-        project: undefined as unknown as string,
+        state_file_path:
+          '/Users/test/project/.claude/ralph-loop.test-123.local.md',
       };
 
-      const result = cancelLoop(sessionNoProject);
+      mockExistsSync.mockReturnValue(true);
+
+      const result = cancelLoop(sessionOldPath);
 
       expect(result.success).toBe(false);
       expect(result.message).toContain('Invalid state file path');
     });
 
-    it('should fail when state file path is outside project directory', () => {
+    it('should fail when state file path is completely outside expected paths', () => {
       const sessionBadPath: Session = {
         ...activeSession,
-        state_file_path: '/etc/passwd', // Outside project directory
+        state_file_path: '/etc/passwd', // Outside loops directory
       };
 
       mockExistsSync.mockReturnValue(true);
 
       const result = cancelLoop(sessionBadPath);
-
-      expect(result.success).toBe(false);
-      expect(result.message).toContain('Invalid state file path');
-    });
-
-    it('should fail when resolve throws an error', () => {
-      // Mock resolve to throw an error (simulates invalid path)
-      mockResolve.mockImplementation(() => {
-        throw new Error('Invalid path');
-      });
-
-      mockExistsSync.mockReturnValue(true);
-
-      const result = cancelLoop(activeSession);
 
       expect(result.success).toBe(false);
       expect(result.message).toContain('Invalid state file path');

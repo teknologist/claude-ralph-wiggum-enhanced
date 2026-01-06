@@ -1,8 +1,13 @@
 import { homedir } from 'os';
 import { join } from 'path';
-import { readFileSync, existsSync } from 'fs';
+import { readFileSync, existsSync, readdirSync } from 'fs';
 
-const TRANSCRIPT_DIR = join(
+// Global paths
+const RALPH_BASE_DIR = join(homedir(), '.claude', 'ralph-wiggum-pro');
+const TRANSCRIPT_DIR = join(RALPH_BASE_DIR, 'transcripts');
+
+// Old path for backward compatibility
+const OLD_TRANSCRIPT_DIR = join(
   homedir(),
   '.claude',
   'ralph-wiggum-pro-logs',
@@ -21,31 +26,83 @@ export interface TranscriptMessage {
 }
 
 /**
- * Get the path to the iterations file for a given loop ID.
+ * Find the iterations file path for a given loop ID.
+ * Handles both new naming ({session_id}-{loop_id}-iterations.jsonl) and
+ * old naming ({loop_id}-iterations.jsonl).
  */
-export function getIterationsFilePath(loopId: string): string {
-  return join(TRANSCRIPT_DIR, `${loopId}-iterations.jsonl`);
+export function getIterationsFilePath(loopId: string): string | null {
+  // Try new directory with glob pattern (new naming: *-{loop_id}-iterations.jsonl)
+  if (existsSync(TRANSCRIPT_DIR)) {
+    const files = readdirSync(TRANSCRIPT_DIR);
+    const match = files.find(
+      (f) =>
+        f.endsWith(`-${loopId}-iterations.jsonl`) ||
+        f === `${loopId}-iterations.jsonl`
+    );
+    if (match) {
+      return join(TRANSCRIPT_DIR, match);
+    }
+  }
+
+  // Try old directory (backward compatibility)
+  if (existsSync(OLD_TRANSCRIPT_DIR)) {
+    const files = readdirSync(OLD_TRANSCRIPT_DIR);
+    const match = files.find(
+      (f) =>
+        f.endsWith(`-${loopId}-iterations.jsonl`) ||
+        f === `${loopId}-iterations.jsonl`
+    );
+    if (match) {
+      return join(OLD_TRANSCRIPT_DIR, match);
+    }
+  }
+
+  return null;
 }
 
 /**
- * Get the path to the full transcript file for a given loop ID.
+ * Find the full transcript file path for a given loop ID.
+ * Handles both new naming ({session_id}-{loop_id}-full.jsonl) and
+ * old naming ({loop_id}-full.jsonl).
  */
-export function getFullTranscriptFilePath(loopId: string): string {
-  return join(TRANSCRIPT_DIR, `${loopId}-full.jsonl`);
+export function getFullTranscriptFilePath(loopId: string): string | null {
+  // Try new directory with glob pattern
+  if (existsSync(TRANSCRIPT_DIR)) {
+    const files = readdirSync(TRANSCRIPT_DIR);
+    const match = files.find(
+      (f) => f.endsWith(`-${loopId}-full.jsonl`) || f === `${loopId}-full.jsonl`
+    );
+    if (match) {
+      return join(TRANSCRIPT_DIR, match);
+    }
+  }
+
+  // Try old directory (backward compatibility)
+  if (existsSync(OLD_TRANSCRIPT_DIR)) {
+    const files = readdirSync(OLD_TRANSCRIPT_DIR);
+    const match = files.find(
+      (f) => f.endsWith(`-${loopId}-full.jsonl`) || f === `${loopId}-full.jsonl`
+    );
+    if (match) {
+      return join(OLD_TRANSCRIPT_DIR, match);
+    }
+  }
+
+  return null;
 }
 
 /**
  * Check if iterations file exists for a given loop ID.
  */
 export function hasIterations(loopId: string): boolean {
-  return existsSync(getIterationsFilePath(loopId));
+  return getIterationsFilePath(loopId) !== null;
 }
 
 /**
  * Check if full transcript file exists for a given loop ID.
  */
 export function hasFullTranscript(loopId: string): boolean {
-  return existsSync(getFullTranscriptFilePath(loopId));
+  return getFullTranscriptFilePath(loopId) !== null;
 }
 
 /**
@@ -55,7 +112,7 @@ export function hasFullTranscript(loopId: string): boolean {
 export function getIterations(loopId: string): IterationEntry[] | null {
   const filePath = getIterationsFilePath(loopId);
 
-  if (!existsSync(filePath)) {
+  if (!filePath || !existsSync(filePath)) {
     return null;
   }
 
@@ -89,7 +146,7 @@ export function getIterations(loopId: string): IterationEntry[] | null {
 export function getFullTranscript(loopId: string): TranscriptMessage[] | null {
   const filePath = getFullTranscriptFilePath(loopId);
 
-  if (!existsSync(filePath)) {
+  if (!filePath || !existsSync(filePath)) {
     return null;
   }
 
@@ -137,7 +194,7 @@ export function getFullTranscript(loopId: string): TranscriptMessage[] | null {
 export function getRawFullTranscript(loopId: string): string | null {
   const filePath = getFullTranscriptFilePath(loopId);
 
-  if (!existsSync(filePath)) {
+  if (!filePath || !existsSync(filePath)) {
     return null;
   }
 
