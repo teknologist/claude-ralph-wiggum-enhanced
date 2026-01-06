@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { renderHook, waitFor } from '@testing-library/react';
+import { renderHook, waitFor, act } from '@testing-library/react';
 import React from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useSessions } from '../hooks/useSessions';
@@ -12,12 +12,26 @@ import {
   useFullTranscript,
   useTranscriptAvailability,
 } from '../hooks/useTranscript';
+import { useDeleteAllArchived } from '../hooks/useDeleteAllArchived';
 import type {
   SessionsResponse,
   IterationsResponse,
   FullTranscriptResponse,
   TranscriptAvailabilityResponse,
+  DeleteAllResponse,
 } from '../../server/types';
+
+// Mock websocket module
+vi.mock('../lib/websocket', () => ({
+  subscribeToTranscript: vi.fn(() => vi.fn()),
+  subscribeToChecklist: vi.fn(() => vi.fn()),
+  transcriptWebSocket: {
+    subscribe: vi.fn(() => vi.fn()),
+    subscribeChecklist: vi.fn(() => vi.fn()),
+    disconnect: vi.fn(),
+    isConnected: vi.fn(() => false),
+  },
+}));
 
 function createWrapper() {
   const queryClient = new QueryClient({
@@ -551,6 +565,164 @@ describe('useTranscriptIterations', () => {
       { timeout: 5000 }
     );
   });
+
+  it('subscribes to WebSocket for active sessions', async () => {
+    const mockResponse: IterationsResponse = {
+      iterations: [
+        { iteration: 1, timestamp: '2024-01-15T10:00:00Z', output: 'First' },
+      ],
+    };
+
+    vi.mocked(global.fetch).mockResolvedValueOnce({
+      ok: true,
+      json: async () => mockResponse,
+    } as Response);
+
+    const { subscribeToTranscript } = await import('../lib/websocket');
+
+    renderHook(() => useTranscriptIterations('loop-123', true, true), {
+      wrapper: createWrapper(),
+    });
+
+    // Wait for query to complete
+    await waitFor(
+      () => {
+        expect(subscribeToTranscript).toHaveBeenCalledWith(
+          'loop-123',
+          expect.any(Function)
+        );
+      },
+      { timeout: 3000 }
+    );
+  });
+
+  it('merges WebSocket updates with existing data', async () => {
+    const mockResponse: IterationsResponse = {
+      iterations: [
+        { iteration: 1, timestamp: '2024-01-15T10:00:00Z', output: 'First' },
+        { iteration: 2, timestamp: '2024-01-15T10:05:00Z', output: 'Second' },
+      ],
+    };
+
+    vi.mocked(global.fetch).mockResolvedValueOnce({
+      ok: true,
+      json: async () => mockResponse,
+    } as Response);
+
+    // Mock subscribeToTranscript with callback invocation
+    let receivedCallback: ((iterations: any[]) => void) | null = null;
+    vi.mocked(
+      await import('../lib/websocket')
+    ).subscribeToTranscript.mockImplementation((_loopId, callback) => {
+      receivedCallback = callback;
+      return vi.fn();
+    });
+
+    const { result } = renderHook(
+      () => useTranscriptIterations('loop-123', true, true),
+      { wrapper: createWrapper() }
+    );
+
+    // Wait for initial data to load
+    await waitFor(
+      () => {
+        expect(result.current.isSuccess).toBe(true);
+      },
+      { timeout: 3000 }
+    );
+
+    expect(result.current.data?.iterations).toHaveLength(2);
+
+    // Simulate WebSocket update with new iteration
+    act(() => {
+      receivedCallback?.([
+        { iteration: 3, timestamp: '2024-01-15T10:10:00Z', output: 'Third' },
+      ]);
+    });
+
+    // Should merge and have 3 iterations
+    await waitFor(() => {
+      expect(result.current.data?.iterations).toHaveLength(3);
+      expect(result.current.data?.iterations[2].iteration).toBe(3);
+    });
+  });
+
+  it('deduplicates iterations from WebSocket', async () => {
+    const mockResponse: IterationsResponse = {
+      iterations: [
+        { iteration: 1, timestamp: '2024-01-15T10:00:00Z', output: 'First' },
+      ],
+    };
+
+    vi.mocked(global.fetch).mockResolvedValueOnce({
+      ok: true,
+      json: async () => mockResponse,
+    } as Response);
+
+    // Mock subscribeToTranscript
+    let receivedCallback: ((iterations: any[]) => void) | null = null;
+    vi.mocked(
+      await import('../lib/websocket')
+    ).subscribeToTranscript.mockImplementation((_loopId, callback) => {
+      receivedCallback = callback;
+      return vi.fn();
+    });
+
+    const { result } = renderHook(
+      () => useTranscriptIterations('loop-123', true, true),
+      { wrapper: createWrapper() }
+    );
+
+    // Wait for initial data to load
+    await waitFor(
+      () => {
+        expect(result.current.isSuccess).toBe(true);
+      },
+      { timeout: 3000 }
+    );
+
+    expect(result.current.data?.iterations).toHaveLength(1);
+
+    // Simulate WebSocket update with duplicate iteration
+    act(() => {
+      receivedCallback?.([
+        { iteration: 1, timestamp: '2024-01-15T10:00:00Z', output: 'First' },
+      ]);
+    });
+
+    // Should still have only 1 iteration (deduplicated)
+    await waitFor(() => {
+      expect(result.current.data?.iterations).toHaveLength(1);
+    });
+  });
+
+  it('does not subscribe when not active', async () => {
+    const mockResponse: IterationsResponse = {
+      iterations: [
+        { iteration: 1, timestamp: '2024-01-15T10:00:00Z', output: 'First' },
+      ],
+    };
+
+    vi.mocked(global.fetch).mockResolvedValueOnce({
+      ok: true,
+      json: async () => mockResponse,
+    } as Response);
+
+    const { subscribeToTranscript } = await import('../lib/websocket');
+
+    renderHook(
+      () => useTranscriptIterations('loop-123', true, false), // isActive = false
+      { wrapper: createWrapper() }
+    );
+
+    // Wait for query to complete
+    await waitFor(
+      () => {
+        expect(subscribeToTranscript).not.toHaveBeenCalled();
+      },
+      { timeout: 3000 }
+    );
+  });
 });
 
 describe('useFullTranscript', () => {
@@ -666,5 +838,101 @@ describe('useTranscriptAvailability', () => {
       },
       { timeout: 5000 }
     );
+  });
+});
+
+describe('useDeleteAllArchived', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('successfully deletes all archived sessions', async () => {
+    const mockResponse: DeleteAllResponse = {
+      success: true,
+      deleted_count: 5,
+      message: 'Permanently deleted 5 archived session(s)',
+    };
+
+    vi.mocked(global.fetch).mockResolvedValueOnce({
+      ok: true,
+      json: async () => mockResponse,
+    } as Response);
+
+    const { result } = renderHook(() => useDeleteAllArchived(), {
+      wrapper: createWrapper(),
+    });
+
+    result.current.mutate();
+
+    await waitFor(() => {
+      expect(result.current.isSuccess).toBe(true);
+    });
+
+    expect(result.current.data).toEqual(mockResponse);
+    expect(global.fetch).toHaveBeenCalledWith('/api/sessions', {
+      method: 'DELETE',
+    });
+  });
+
+  it('invalidates sessions query on success', async () => {
+    const mockResponse: DeleteAllResponse = {
+      success: true,
+      deleted_count: 3,
+      message: 'Permanently deleted 3 archived session(s)',
+    };
+
+    vi.mocked(global.fetch).mockResolvedValueOnce({
+      ok: true,
+      json: async () => mockResponse,
+    } as Response);
+
+    // Create a custom wrapper with accessible queryClient
+    const testQueryClient = new QueryClient({
+      defaultOptions: {
+        queries: { retry: false },
+        mutations: { retry: false },
+      },
+    });
+
+    const invalidateQueriesSpy = vi.spyOn(testQueryClient, 'invalidateQueries');
+
+    const customWrapper = ({ children }: { children: React.ReactNode }) => (
+      <QueryClientProvider client={testQueryClient}>
+        {children}
+      </QueryClientProvider>
+    );
+
+    const { result } = renderHook(() => useDeleteAllArchived(), {
+      wrapper: customWrapper,
+    });
+
+    result.current.mutate();
+
+    await waitFor(() => {
+      expect(invalidateQueriesSpy).toHaveBeenCalledWith({
+        queryKey: ['sessions'],
+      });
+    });
+  });
+
+  it('handles API error', async () => {
+    vi.mocked(global.fetch).mockResolvedValueOnce({
+      ok: false,
+      status: 500,
+      json: async () => ({
+        error: 'DELETE_ERROR',
+        message: 'Failed to delete',
+      }),
+    } as Response);
+
+    const { result } = renderHook(() => useDeleteAllArchived(), {
+      wrapper: createWrapper(),
+    });
+
+    result.current.mutate();
+
+    await waitFor(() => {
+      expect(result.current.isError).toBe(true);
+    });
   });
 });

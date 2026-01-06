@@ -45,6 +45,14 @@ describe('StatusBadge', () => {
     expect(badge).toHaveClass('bg-red-100', 'text-red-700');
   });
 
+  it('renders abandoned status', () => {
+    render(<StatusBadge status="abandoned" />);
+
+    expect(screen.getByText('⏹ Abandoned')).toBeInTheDocument();
+    const badge = screen.getByText('⏹ Abandoned');
+    expect(badge).toHaveClass('bg-orange-100', 'text-orange-700');
+  });
+
   it('renders orphaned status with indicator', () => {
     render(<StatusBadge status="orphaned" />);
 

@@ -5,8 +5,16 @@ import {
   cancelSession,
   deleteSession,
   archiveSession,
+  fetchTranscriptIterations,
+  fetchFullTranscript,
+  checkTranscriptAvailability,
 } from '../lib/api';
-import type { SessionsResponse, Session } from '../../server/types';
+import type {
+  SessionsResponse,
+  Session,
+  FullTranscriptResponse,
+  TranscriptAvailabilityResponse,
+} from '../../server/types';
 
 describe('API client', () => {
   const mockFetch = vi.fn();
@@ -229,6 +237,132 @@ describe('API client', () => {
 
       await expect(archiveSession('nonexistent')).rejects.toThrow(
         'Loop not found: nonexistent'
+      );
+    });
+  });
+
+  describe('fetchTranscriptIterations', () => {
+    it('should fetch transcript iterations successfully', async () => {
+      const mockResponse = {
+        iterations: [
+          { iteration: 1, timestamp: '2024-01-15T10:00:00Z', output: 'Test' },
+        ],
+      };
+
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve(mockResponse),
+      });
+
+      const result = await fetchTranscriptIterations('loop-123');
+
+      expect(mockFetch).toHaveBeenCalledWith(
+        '/api/transcript/loop-123/iterations'
+      );
+      expect(result).toEqual(mockResponse);
+    });
+
+    it('should return empty array on 404 (no transcript yet)', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: false,
+        status: 404,
+        json: () =>
+          Promise.resolve({ error: 'NOT_FOUND', message: 'Not found' }),
+      });
+
+      const result = await fetchTranscriptIterations('loop-123');
+
+      expect(result).toEqual({ iterations: [] });
+    });
+
+    it('should throw error on non-404 failure', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: false,
+        status: 500,
+        json: () =>
+          Promise.resolve({ error: 'INTERNAL_ERROR', message: 'Server error' }),
+      });
+
+      await expect(fetchTranscriptIterations('loop-123')).rejects.toThrow(
+        'Server error'
+      );
+    });
+  });
+
+  describe('fetchFullTranscript', () => {
+    it('should fetch full transcript successfully', async () => {
+      const mockResponse: FullTranscriptResponse = {
+        messages: [
+          { role: 'user', content: 'Hello' },
+          { role: 'assistant', content: 'Hi there!' },
+        ],
+      };
+
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve(mockResponse),
+      });
+
+      const result = await fetchFullTranscript('loop-123');
+
+      expect(mockFetch).toHaveBeenCalledWith('/api/transcript/loop-123/full');
+      expect(result).toEqual(mockResponse);
+    });
+
+    it('should return empty array on 404 (no transcript yet)', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: false,
+        status: 404,
+        json: () =>
+          Promise.resolve({ error: 'NOT_FOUND', message: 'Not found' }),
+      });
+
+      const result = await fetchFullTranscript('loop-123');
+
+      expect(result).toEqual({ messages: [] });
+    });
+
+    it('should throw error on non-404 failure', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: false,
+        status: 500,
+        json: () =>
+          Promise.resolve({ error: 'INTERNAL_ERROR', message: 'Server error' }),
+      });
+
+      await expect(fetchFullTranscript('loop-123')).rejects.toThrow(
+        'Server error'
+      );
+    });
+  });
+
+  describe('checkTranscriptAvailability', () => {
+    it('should check transcript availability successfully', async () => {
+      const mockResponse: TranscriptAvailabilityResponse = {
+        hasIterations: true,
+        hasFullTranscript: true,
+      };
+
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve(mockResponse),
+      });
+
+      const result = await checkTranscriptAvailability('loop-123');
+
+      expect(mockFetch).toHaveBeenCalledWith('/api/transcript/loop-123');
+      expect(result).toEqual(mockResponse);
+    });
+
+    it('should throw error on failure', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: false,
+        json: () =>
+          Promise.resolve({ error: 'INTERNAL_ERROR', message: 'Server error' }),
+      });
+
+      await expect(checkTranscriptAvailability('loop-123')).rejects.toThrow(
+        'Server error'
       );
     });
   });

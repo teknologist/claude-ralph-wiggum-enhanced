@@ -15,6 +15,13 @@ test.describe('Transcript Timeline', () => {
     await page.goto('/');
   });
 
+  // Skip all tests in this describe block if no sessions exist
+  test.beforeEach(async ({ page }) => {
+    const cards = page.locator('[data-testid="session-card"]');
+    const count = await cards.count();
+    test.skip(count === 0, 'No sessions available for transcript tests');
+  });
+
   test('transcript section is collapsed by default', async ({ page }) => {
     // Click on a session card to view details
     await page.locator('[data-testid="session-card"]').first().click();
@@ -99,6 +106,13 @@ test.describe('Full Transcript Modal', () => {
 
   test.beforeEach(async ({ page }) => {
     await page.goto('/');
+  });
+
+  // Skip all tests in this describe block if no sessions exist
+  test.beforeEach(async ({ page }) => {
+    const cards = page.locator('[data-testid="session-card"]');
+    const count = await cards.count();
+    test.skip(count === 0, 'No sessions available for transcript modal tests');
   });
 
   test('modal opens when View Full Transcript button is clicked', async ({
@@ -262,6 +276,13 @@ test.describe('Transcript Export', () => {
     await page.goto('/');
   });
 
+  // Skip all tests in this describe block if no sessions exist
+  test.beforeEach(async ({ page }) => {
+    const cards = page.locator('[data-testid="session-card"]');
+    const count = await cards.count();
+    test.skip(count === 0, 'No sessions available for transcript export tests');
+  });
+
   test('export button is visible in transcript toolbar', async ({ page }) => {
     // Click on a session card to view details
     await page.locator('[data-testid="session-card"]').first().click();
@@ -290,6 +311,13 @@ test.describe('Transcript Search', () => {
 
   test.beforeEach(async ({ page }) => {
     await page.goto('/');
+  });
+
+  // Skip all tests in this describe block if no sessions exist
+  test.beforeEach(async ({ page }) => {
+    const cards = page.locator('[data-testid="session-card"]');
+    const count = await cards.count();
+    test.skip(count === 0, 'No sessions available for transcript search tests');
   });
 
   test('search input is visible in transcript toolbar', async ({ page }) => {

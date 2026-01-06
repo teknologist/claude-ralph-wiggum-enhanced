@@ -1,5 +1,8 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { handleDeleteSession } from '../api/delete';
+import {
+  handleDeleteSession,
+  handleDeleteAllArchivedSessions,
+} from '../api/delete';
 import * as logParser from '../services/log-parser';
 import type { Session } from '../types';
 
@@ -229,6 +232,63 @@ describe('handleDeleteSession', () => {
     });
 
     const response = handleDeleteSession('error-123');
+
+    expect(response.status).toBe(500);
+    const data = await response.json();
+    expect(data.error).toBe('DELETE_ERROR');
+    expect(data.message).toContain('String error message');
+  });
+});
+
+describe('handleDeleteAllArchivedSessions', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('returns success with deleted count', async () => {
+    vi.spyOn(logParser, 'deleteAllArchivedSessions').mockReturnValue(5);
+
+    const response = handleDeleteAllArchivedSessions();
+
+    expect(response.status).toBe(200);
+    const data = await response.json();
+    expect(data.success).toBe(true);
+    expect(data.deleted_count).toBe(5);
+    expect(data.message).toContain('5 archived session(s)');
+  });
+
+  it('returns zero when no archived sessions exist', async () => {
+    vi.spyOn(logParser, 'deleteAllArchivedSessions').mockReturnValue(0);
+
+    const response = handleDeleteAllArchivedSessions();
+
+    expect(response.status).toBe(200);
+    const data = await response.json();
+    expect(data.success).toBe(true);
+    expect(data.deleted_count).toBe(0);
+    expect(data.message).toContain('0 archived session(s)');
+  });
+
+  it('returns 500 when an Error is thrown', async () => {
+    vi.spyOn(logParser, 'deleteAllArchivedSessions').mockImplementation(() => {
+      throw new Error('Database connection failed');
+    });
+
+    const response = handleDeleteAllArchivedSessions();
+
+    expect(response.status).toBe(500);
+    const data = await response.json();
+    expect(data.error).toBe('DELETE_ERROR');
+    expect(data.message).toContain('Failed to delete archived sessions');
+    expect(data.message).toContain('Database connection failed');
+  });
+
+  it('returns 500 when non-Error object is thrown', async () => {
+    vi.spyOn(logParser, 'deleteAllArchivedSessions').mockImplementation(() => {
+      throw 'String error message';
+    });
+
+    const response = handleDeleteAllArchivedSessions();
 
     expect(response.status).toBe(500);
     const data = await response.json();
