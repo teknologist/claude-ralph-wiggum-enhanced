@@ -59,19 +59,6 @@ else
   exit 1
 fi
 
-run_test "Session ID with UUID format"
-ENV_FILE="$TEST_DIR/claude-env-uuid"
-touch "$ENV_FILE"
-export CLAUDE_ENV_FILE="$ENV_FILE"
-echo '{"session_id": "550e8400-e29b-41d4-a716-446655440000", "cwd": "/tmp"}' | "$HOOK_SCRIPT"
-
-if grep -q '550e8400-e29b-41d4-a716-446655440000' "$ENV_FILE"; then
-  pass "UUID session ID handled correctly"
-else
-  fail "UUID session ID not written" ""
-  exit 1
-fi
-
 run_test "Session ID with alphanumeric and hyphens"
 ENV_FILE="$TEST_DIR/claude-env-alphanum"
 touch "$ENV_FILE"

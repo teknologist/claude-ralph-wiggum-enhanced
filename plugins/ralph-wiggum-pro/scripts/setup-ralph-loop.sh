@@ -21,8 +21,9 @@ MAX_DEBUG_LOG_SIZE=1048576
 rotate_debug_log_if_needed() {
   if [[ -f "$DEBUG_LOG" ]]; then
     local size
-    # Use wc -c which works on both macOS and Linux; trim whitespace
-    size=$(wc -c < "$DEBUG_LOG" 2>/dev/null | tr -d ' ') || size="0"
+    # Use wc -c which works on both macOS and Linux; trim all whitespace
+    # Command wrapped to ensure fallback is evaluated even with set -e
+    size=$( { wc -c < "$DEBUG_LOG" 2>/dev/null | tr -d '[:space:]'; } || echo "0" )
     if [[ "$size" -gt "$MAX_DEBUG_LOG_SIZE" ]]; then
       local tmp_file
       tmp_file=$(mktemp "${DEBUG_LOG}.XXXXXX") || return 0
