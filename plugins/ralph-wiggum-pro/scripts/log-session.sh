@@ -38,29 +38,16 @@ rotate_session_log_if_needed() {
   # Use TypeScript implementation for better safety and testability
   # It only purges COMPLETE sessions (both start + completion exist)
   # to avoid creating orphaned entries
-  local PROJECT_ROOT ROTATE_SCRIPT
-
-  # Determine project root using Claude Code environment variables
-  if [[ -n "${CLAUDE_PROJECT_DIR:-}" ]]; then
-    # Running in hook context - use project directory directly
-    PROJECT_ROOT="$CLAUDE_PROJECT_DIR"
-  elif [[ -n "${CLAUDE_PLUGIN_ROOT:-}" ]]; then
-    # Running in other plugin context - navigate up from plugin root
-    PROJECT_ROOT="$(cd "$CLAUDE_PLUGIN_ROOT/../.." && pwd)"
-  else
-    # Fallback: derive from script location (for direct execution/testing)
-    local SCRIPT_DIR
-    SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-    PROJECT_ROOT="$(cd "$SCRIPT_DIR/../../.." && pwd)"
-  fi
-
-  ROTATE_SCRIPT="$PROJECT_ROOT/ralph-dashboard/server/scripts/rotate-log.ts"
+  #
+  # The rotation script is in the same directory as this script, so it
+  # works correctly whether running from source or from plugin cache.
+  local SCRIPT_DIR ROTATE_SCRIPT
+  SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+  ROTATE_SCRIPT="$SCRIPT_DIR/rotate-session-log.ts"
 
   # DEBUG: Log path resolution (remove after verification)
   {
-    echo "[$(date -u +%Y-%m-%dT%H:%M:%SZ)] rotate: CLAUDE_PROJECT_DIR=${CLAUDE_PROJECT_DIR:-unset}"
-    echo "[$(date -u +%Y-%m-%dT%H:%M:%SZ)] rotate: CLAUDE_PLUGIN_ROOT=${CLAUDE_PLUGIN_ROOT:-unset}"
-    echo "[$(date -u +%Y-%m-%dT%H:%M:%SZ)] rotate: PROJECT_ROOT=$PROJECT_ROOT"
+    echo "[$(date -u +%Y-%m-%dT%H:%M:%SZ)] rotate: SCRIPT_DIR=$SCRIPT_DIR"
     echo "[$(date -u +%Y-%m-%dT%H:%M:%SZ)] rotate: ROTATE_SCRIPT=$ROTATE_SCRIPT"
     echo "[$(date -u +%Y-%m-%dT%H:%M:%SZ)] rotate: script_exists=$([[ -f "$ROTATE_SCRIPT" ]] && echo yes || echo no)"
   } >> "$LOG_DIR/debug.log" 2>/dev/null || true

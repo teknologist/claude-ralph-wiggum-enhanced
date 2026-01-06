@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.3.5] - 2026-01-06
+
+### Fixed
+- **Rotation script not found in plugin cache**: Moved `rotate-session-log.ts` into the plugin tree (`scripts/`) so it gets cached with the plugin. Previously the script was in `ralph-dashboard/` which is not part of the cached plugin.
+
+### Changed
+- **Simplified rotation path resolution**: Now uses `$SCRIPT_DIR/rotate-session-log.ts` (same directory) instead of complex `CLAUDE_PROJECT_DIR`/`CLAUDE_PLUGIN_ROOT` environment variable detection
+
 ## [2.3.4] - 2026-01-06
 
 ### Added
