@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.2.3] - 2026-01-06
+
+### Fixed
+- **Session ID Race Condition After `/clear`**: Fixed remaining race condition where `setup-ralph-loop.sh` would read stale `$CLAUDE_SESSION_ID` env var after `/clear`
+  - Root cause: Even though session-start-hook wrote fresh ID to `CLAUDE_ENV_FILE`, the in-memory env var remained stale
+  - Fix: `setup-ralph-loop.sh` now sources `CLAUDE_ENV_FILE` before reading `$CLAUDE_SESSION_ID` to get the authoritative value
+
+### Added
+- **Debug Logging in setup-ralph-loop.sh**: Added comprehensive debug logging to track session ID handling
+  - Logs `CLAUDE_ENV_FILE` path, `CLAUDE_SESSION_ID` before/after sourcing, and final `SESSION_ID`
+  - Includes warning when `CLAUDE_ENV_FILE` is set but file doesn't exist
+  - Uses same log rotation mechanism as other hooks (1MB limit)
+
 ## [2.2.2] - 2026-01-06
 
 ### Added

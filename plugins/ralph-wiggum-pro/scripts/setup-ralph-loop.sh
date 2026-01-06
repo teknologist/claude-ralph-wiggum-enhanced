@@ -6,6 +6,41 @@
 
 set -euo pipefail
 
+# Global paths for debug logging
+RALPH_BASE_DIR="$HOME/.claude/ralph-wiggum-pro"
+LOGS_DIR="$RALPH_BASE_DIR/logs"
+DEBUG_LOG="$LOGS_DIR/debug.log"
+
+# Ensure log directory exists
+mkdir -p "$LOGS_DIR"
+
+# Maximum debug log size (1MB)
+MAX_DEBUG_LOG_SIZE=1048576
+
+# Rotate debug log if it exceeds maximum size
+rotate_debug_log_if_needed() {
+  if [[ -f "$DEBUG_LOG" ]]; then
+    local size
+    size=$(stat -f%z "$DEBUG_LOG" 2>/dev/null || stat -c%s "$DEBUG_LOG" 2>/dev/null || { wc -c < "$DEBUG_LOG" 2>/dev/null; } || echo "0")
+    if [[ "$size" -gt "$MAX_DEBUG_LOG_SIZE" ]]; then
+      local tmp_file
+      tmp_file=$(mktemp "${DEBUG_LOG}.XXXXXX") || return 0
+      if tail -n 5000 "$DEBUG_LOG" > "$tmp_file" 2>/dev/null; then
+        mv "$tmp_file" "$DEBUG_LOG" 2>/dev/null || rm -f "$tmp_file" 2>/dev/null
+      else
+        rm -f "$tmp_file" 2>/dev/null || true
+      fi
+    fi
+  fi
+}
+
+# Debug logging helper (with auto-rotation)
+debug_log() {
+  local msg="$1"
+  rotate_debug_log_if_needed
+  echo "[$(date -u +%Y-%m-%dT%H:%M:%SZ)] setup-ralph-loop: $msg" >> "$DEBUG_LOG"
+}
+
 # Parse arguments
 PROMPT_PARTS=()
 MAX_ITERATIONS=0
@@ -323,7 +358,27 @@ PROMPT=$(echo "$PROMPT" | sed -E 's/[[:space:]]*--force[[:space:]]*/ /g' | sed -
 PROMPT=$(_cleanup_whitespace "$PROMPT")
 
 # Get session ID from environment (set by SessionStart hook via CLAUDE_ENV_FILE)
+# IMPORTANT: Source CLAUDE_ENV_FILE first to get fresh value after /clear
+# This fixes race condition where env var is stale after /clear
+debug_log "=== SETUP-RALPH-LOOP INVOKED ==="
+debug_log "CLAUDE_ENV_FILE=${CLAUDE_ENV_FILE:-not_set}"
+debug_log "CLAUDE_SESSION_ID (before source)=${CLAUDE_SESSION_ID:-not_set}"
+
+if [[ -n "${CLAUDE_ENV_FILE:-}" ]]; then
+  if [[ -f "$CLAUDE_ENV_FILE" ]]; then
+    debug_log "Sourcing CLAUDE_ENV_FILE: $CLAUDE_ENV_FILE"
+    # shellcheck source=/dev/null
+    source "$CLAUDE_ENV_FILE"
+    debug_log "CLAUDE_SESSION_ID (after source)=${CLAUDE_SESSION_ID:-not_set}"
+  else
+    debug_log "WARNING: CLAUDE_ENV_FILE set but file does not exist: $CLAUDE_ENV_FILE"
+  fi
+else
+  debug_log "CLAUDE_ENV_FILE not set"
+fi
+
 SESSION_ID="${CLAUDE_SESSION_ID:-}"
+debug_log "Final SESSION_ID=$SESSION_ID"
 
 # FAIL LOUDLY: Session ID is required - no fallbacks
 if [[ -z "$SESSION_ID" ]]; then
@@ -338,10 +393,8 @@ if [[ -z "$SESSION_ID" ]]; then
   exit 1
 fi
 
-# Create global directories
-RALPH_BASE_DIR="$HOME/.claude/ralph-wiggum-pro"
+# Create global directories (RALPH_BASE_DIR and LOGS_DIR defined at top for debug logging)
 LOOPS_DIR="$RALPH_BASE_DIR/loops"
-LOGS_DIR="$RALPH_BASE_DIR/logs"
 TRANSCRIPTS_DIR="$RALPH_BASE_DIR/transcripts"
 mkdir -p "$LOOPS_DIR" "$LOGS_DIR" "$TRANSCRIPTS_DIR"
 
