@@ -323,6 +323,61 @@ describe('ChecklistProgress', () => {
         screen.getByText('No acceptance criteria defined yet')
       ).toBeInTheDocument();
     });
+
+    it('renders nothing when all items are TODO placeholders', () => {
+      const baseChecklist = mockChecklistResponse.checklist;
+      if (!baseChecklist)
+        throw new Error('mockChecklistResponse.checklist is null');
+
+      const placeholderResponse: ChecklistResponse = {
+        checklist: {
+          loop_id: baseChecklist.loop_id,
+          session_id: baseChecklist.session_id,
+          project: baseChecklist.project,
+          project_name: baseChecklist.project_name,
+          created_at: baseChecklist.created_at,
+          updated_at: baseChecklist.updated_at,
+          completion_criteria: [
+            {
+              id: 'c1',
+              text: 'TODO: Define acceptance criterion 1',
+              status: 'pending',
+              created_at: '2024-01-15T10:30:00Z',
+              completed_at: null,
+              completed_iteration: null,
+            },
+            {
+              id: 'c2',
+              text: 'TODO: Define acceptance criterion 2',
+              status: 'pending',
+              created_at: '2024-01-15T10:30:00Z',
+              completed_at: null,
+              completed_iteration: null,
+            },
+          ],
+        },
+        progress: {
+          criteria: '0/2 criteria',
+          criteriaCompleted: 0,
+          criteriaTotal: 2,
+        },
+      };
+
+      mockUseChecklist.mockReturnValue({
+        data: placeholderResponse,
+        isLoading: false,
+        error: null,
+        isError: false,
+        refetch: vi.fn(),
+      } as any);
+
+      const { container } = render(<ChecklistProgress loopId="test-loop" />, {
+        wrapper: createWrapper(),
+      });
+
+      // TODO placeholder checklists render nothing (hidden until agent populates)
+      expect(container.firstChild).toBeNull();
+    });
   });
 
   describe('completed iteration display', () => {

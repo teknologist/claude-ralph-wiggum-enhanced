@@ -170,19 +170,27 @@ export function ChecklistProgress({
     isActive
   );
 
-  const { progressSummary, criteriaCount } = useMemo(() => {
+  const { progressSummary, criteriaCount, allPlaceholders } = useMemo(() => {
     if (!data?.checklist) {
-      return { progressSummary: '', criteriaCount: 0 };
+      return { progressSummary: '', criteriaCount: 0, allPlaceholders: true };
     }
 
     const criteriaCompleted = data.checklist.completion_criteria.filter(
       (item) => item.status === 'completed'
     ).length;
     const criteriaTotal = data.checklist.completion_criteria.length;
+    // Only consider all placeholders if there are actual items
+    // Empty array should not be considered "all placeholders"
+    const allTodoPlaceholders =
+      criteriaTotal > 0 &&
+      data.checklist.completion_criteria.every((item) =>
+        item.text.startsWith('TODO:')
+      );
 
     return {
       progressSummary: `${criteriaCompleted}/${criteriaTotal} criteria`,
       criteriaCount: criteriaTotal,
+      allPlaceholders: allTodoPlaceholders,
     };
   }, [data]);
 
@@ -210,6 +218,11 @@ export function ChecklistProgress({
   }
 
   if (!data?.checklist) {
+    return null;
+  }
+
+  // Hide checklist if all items are still TODO placeholders (agent hasn't populated yet)
+  if (allPlaceholders) {
     return null;
   }
 
