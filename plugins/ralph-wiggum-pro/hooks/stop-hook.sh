@@ -133,13 +133,22 @@ copy_full_transcript() {
 # Read hook input from stdin (advanced stop hook API)
 HOOK_INPUT=$(cat)
 
-# Extract session ID from hook input
+# Extract session ID and stop_hook_active from hook input
 CURRENT_SESSION_ID=$(echo "$HOOK_INPUT" | jq -r '.session_id // empty')
+STOP_HOOK_ACTIVE=$(echo "$HOOK_INPUT" | jq -r '.stop_hook_active // false')
 
 # Debug: Log session IDs and context
 debug_log "=== STOP HOOK INVOKED ==="
 debug_log "hook_input_session_id=$CURRENT_SESSION_ID"
+debug_log "stop_hook_active=$STOP_HOOK_ACTIVE"
 debug_log "CLAUDE_SESSION_ID_env=${CLAUDE_SESSION_ID:-not_set}"
+
+# Check stop_hook_active to prevent infinite loops (per Claude Code docs)
+# If Claude is already continuing due to a previous stop hook, allow exit
+if [[ "$STOP_HOOK_ACTIVE" == "true" ]]; then
+  debug_log "EXIT: stop_hook_active=true - preventing infinite loop"
+  exit 0
+fi
 
 if [[ -z "$CURRENT_SESSION_ID" ]]; then
   # No session ID available - allow exit (shouldn't happen)
@@ -159,8 +168,28 @@ RALPH_STATE_FILE="$LOOPS_DIR/ralph-loop.${CURRENT_SESSION_ID}.local.md"
 debug_log "State file path: $RALPH_STATE_FILE"
 
 if [[ ! -f "$RALPH_STATE_FILE" ]]; then
-  # No active loop for this session - allow exit
-  debug_log "EXIT: No state file found for session_id=$CURRENT_SESSION_ID"
+  # Try fallback: check if CLAUDE_SESSION_ID env var has a different session ID
+  # This handles cases where hook input session_id doesn't match the state file
+  FALLBACK_SESSION_ID="${CLAUDE_SESSION_ID:-}"
+  if [[ -n "$FALLBACK_SESSION_ID" ]] && [[ "$FALLBACK_SESSION_ID" != "$CURRENT_SESSION_ID" ]]; then
+    # Validate fallback session ID format (same security check)
+    if [[ "$FALLBACK_SESSION_ID" =~ ^[a-zA-Z0-9._-]+$ ]] && [[ "$FALLBACK_SESSION_ID" != *".."* ]]; then
+      FALLBACK_STATE_FILE="$LOOPS_DIR/ralph-loop.${FALLBACK_SESSION_ID}.local.md"
+      debug_log "Trying fallback session ID from env: $FALLBACK_SESSION_ID"
+      debug_log "Fallback state file path: $FALLBACK_STATE_FILE"
+      if [[ -f "$FALLBACK_STATE_FILE" ]]; then
+        debug_log "SUCCESS: Found state file via env fallback"
+        RALPH_STATE_FILE="$FALLBACK_STATE_FILE"
+        # Update session ID to match the state file we're using
+        CURRENT_SESSION_ID="$FALLBACK_SESSION_ID"
+      fi
+    fi
+  fi
+fi
+
+if [[ ! -f "$RALPH_STATE_FILE" ]]; then
+  # No active loop for this session (even after fallback) - allow exit
+  debug_log "EXIT: No state file found for session_id=$CURRENT_SESSION_ID (fallback also failed)"
   exit 0
 fi
 

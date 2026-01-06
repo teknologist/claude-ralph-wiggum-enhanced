@@ -8,9 +8,9 @@ set -euo pipefail
 # Transcript directory for storing checklists
 TRANSCRIPT_DIR="$HOME/.claude/ralph-wiggum-pro/transcripts"
 
-# Debug logging helper
+# Debug logging helper - uses unique name to avoid overwriting parent script's debug_log
 DEBUG_LOG="$HOME/.claude/ralph-wiggum-pro/logs/debug.log"
-debug_log() {
+_checklist_debug_log() {
   local msg="$1"
   echo "[$(date -u +%Y-%m-%dT%H:%M:%SZ)] checklist-service: $msg" >> "$DEBUG_LOG"
 }
@@ -19,15 +19,15 @@ debug_log() {
 validate_loop_id() {
   local loop_id="$1"
   if [[ -z "$loop_id" ]]; then
-    debug_log "ERROR: loop_id is empty"
+    _checklist_debug_log "ERROR: loop_id is empty"
     return 1
   fi
   if [[ ! "$loop_id" =~ ^[a-zA-Z0-9._-]{1,256}$ ]]; then
-    debug_log "ERROR: Invalid loop_id format: $loop_id"
+    _checklist_debug_log "ERROR: Invalid loop_id format: $loop_id"
     return 1
   fi
   if [[ "$loop_id" == *".."* ]]; then
-    debug_log "ERROR: loop_id contains path traversal sequence: $loop_id"
+    _checklist_debug_log "ERROR: loop_id contains path traversal sequence: $loop_id"
     return 1
   fi
   return 0
@@ -145,7 +145,7 @@ checklist_init() {
   # Write checklist file
   echo "$checklist_json" > "$checklist_path"
 
-  debug_log "Created checklist for loop_id: $loop_id"
+  _checklist_debug_log "Created checklist for loop_id: $loop_id"
   return 0
 }
 
@@ -231,7 +231,7 @@ checklist_status() {
   # Write updated checklist
   echo "$updated" > "$checklist_path"
 
-  debug_log "Updated item $item_id to status '$status' for loop_id: $loop_id"
+  _checklist_debug_log "Updated item $item_id to status '$status' for loop_id: $loop_id"
   return 0
 }
 
@@ -319,7 +319,7 @@ checklist_add() {
   # Write updated checklist
   echo "$updated" > "$checklist_path"
 
-  debug_log "Added $type item $item_id to checklist for loop_id: $loop_id"
+  _checklist_debug_log "Added $type item $item_id to checklist for loop_id: $loop_id"
   return 0
 }
 

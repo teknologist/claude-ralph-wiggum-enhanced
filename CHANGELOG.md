@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.2.6] - 2026-01-06
+
+### Fixed
+- **Session ID Mismatch in Stop Hook**: Fixed critical bug where stop hook couldn't find state files due to session ID mismatch between hook input and environment
+  - Root cause: Hook input `session_id` sometimes differs from `$CLAUDE_SESSION_ID` env var (e.g., after `/clear` or with multiple Claude Code processes)
+  - Fix: Stop hook now tries `$CLAUDE_SESSION_ID` env var as fallback when hook input session_id doesn't match any state file
+  - Added security validation for fallback session ID (same regex + path traversal checks)
+
+### Added
+- **`stop_hook_active` Check**: Added check per Claude Code docs to prevent infinite loops when stop hook triggers repeatedly
+- **Enhanced Debug Logging**: Added detailed process tree walk logging in `setup-ralph-loop.sh` to diagnose session ID resolution
+  - Logs each PID checked during process tree walk
+  - Logs when falling back to env var vs using PPID file
+
+### Changed
+- **Checklist Service Debug Function**: Renamed `debug_log()` to `_checklist_debug_log()` in `checklist-service.sh` to avoid overwriting parent script's function when sourced
+
 ## [2.2.5] - 2026-01-06
 
 ### Fixed

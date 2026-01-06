@@ -373,17 +373,23 @@ find_session_from_process_tree() {
   local max_depth=10
   local depth=0
 
+  debug_log "Process tree walk starting from PID: $current_pid"
+
   while [[ $depth -lt $max_depth ]] && [[ "$current_pid" -gt 1 ]]; do
     local session_file="$SESSIONS_DIR/ppid_$current_pid.id"
     if [[ -f "$session_file" ]]; then
+      debug_log "Process tree walk: Found session file at depth $depth for PID $current_pid"
       cat "$session_file"
       return 0
     fi
     # Get parent PID (works on macOS and Linux)
-    current_pid=$(ps -o ppid= -p "$current_pid" 2>/dev/null | tr -d ' ')
+    local parent_pid=$(ps -o ppid= -p "$current_pid" 2>/dev/null | tr -d ' ')
+    debug_log "Process tree walk: depth=$depth pid=$current_pid -> parent=$parent_pid (no match)"
+    current_pid="$parent_pid"
     [[ -z "$current_pid" ]] && break
     ((depth++))
   done
+  debug_log "Process tree walk: FAILED after $depth iterations"
   return 1
 }
 
@@ -392,10 +398,15 @@ if SESSION_ID=$(find_session_from_process_tree); then
   debug_log "Read session ID from process tree: $SESSION_ID"
 else
   SESSION_ID="${CLAUDE_SESSION_ID:-}"
-  debug_log "WARNING: No PPID file in process tree, falling back to env var: $SESSION_ID"
+  if [[ -n "$SESSION_ID" ]]; then
+    debug_log "Using CLAUDE_SESSION_ID env var fallback: $SESSION_ID"
+  else
+    debug_log "WARNING: No PPID file and no CLAUDE_SESSION_ID env var"
+  fi
 fi
 
 debug_log "Final SESSION_ID=$SESSION_ID"
+debug_log "State file will be: $RALPH_BASE_DIR/loops/ralph-loop.${SESSION_ID}.local.md"
 
 # FAIL LOUDLY: Session ID is required - no fallbacks
 if [[ -z "$SESSION_ID" ]]; then
