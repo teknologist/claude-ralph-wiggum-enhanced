@@ -480,7 +480,33 @@ if [[ -n "$LOOP_ID" ]] && declare -f checklist_exists > /dev/null && checklist_e
   CHECKLIST_SUMMARY=$(checklist_summary "$LOOP_ID" 2>/dev/null || echo "")
   CHECKLIST_STATUS_LIST=$(checklist_status_list "$LOOP_ID" 2>/dev/null || echo "")
 
-  CHECKLIST_INSTRUCTION="
+  # Check if checklist still has TODO placeholders (needs population)
+  POPULATE_REMINDER=""
+  if declare -f checklist_has_placeholders > /dev/null && checklist_has_placeholders "$LOOP_ID" 2>/dev/null; then
+    POPULATE_REMINDER="
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!! ACTION REQUIRED: POPULATE ACCEPTANCE CRITERIA !!
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+Your checklist still contains TODO placeholder items!
+You MUST populate it with REAL acceptance criteria BEFORE continuing work.
+
+Run this command to replace placeholders:
+  $CHECKLIST_SERVICE checklist_init \"$LOOP_ID\" '<json>' --force
+
+JSON format:
+  {\"completion_criteria\":[{\"id\":\"c1\",\"text\":\"Real criterion 1\"},{\"id\":\"c2\",\"text\":\"Real criterion 2\"}]}
+
+OR update items individually:
+  $CHECKLIST_SERVICE checklist_update_text \"$LOOP_ID\" \"c1\" \"Actual acceptance criterion\"
+
+DO NOT SKIP THIS STEP - the completion promise cannot be output
+until ALL criteria are marked completed with real criteria text.
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
+  fi
+
+  CHECKLIST_INSTRUCTION="$POPULATE_REMINDER
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 ACCEPTANCE CRITERIA ($CHECKLIST_SUMMARY)

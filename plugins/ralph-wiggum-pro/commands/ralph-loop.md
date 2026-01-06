@@ -80,41 +80,6 @@ if [ -n "$STATE_FILE" ] && [ -f "$STATE_FILE" ]; then
   # Get loop_id for checklist operations
   LOOP_ID=$(grep '^loop_id:' "$STATE_FILE" | sed 's/loop_id: *//' | sed 's/"//g')
   CHECKLIST_SCRIPT="${CLAUDE_PLUGIN_ROOT}/scripts/checklist-service.sh"
-
-  echo ""
-  echo "═══════════════════════════════════════════════════════════"
-  echo "MANDATORY: POPULATE ACCEPTANCE CRITERIA CHECKLIST"
-  echo "═══════════════════════════════════════════════════════════"
-  echo ""
-  echo "A placeholder checklist has been created with TODO items."
-  echo "BEFORE starting work, you MUST populate it with real acceptance"
-  echo "criteria. These are the conditions that must ALL be true before"
-  echo "you can output the completion promise."
-  echo ""
-  echo "1. ANALYZE the task and identify what 'done' means"
-  echo "2. DEFINE 3-6 specific, verifiable acceptance criteria"
-  echo "3. REPLACE the placeholder checklist by running:"
-  echo ""
-  echo "   $CHECKLIST_SCRIPT checklist_init \"$LOOP_ID\" '<json>' --force"
-  echo ""
-  echo "JSON format:"
-  echo '   {"completion_criteria":[{"id":"c1","text":"..."},{"id":"c2","text":"..."}]}'
-  echo ""
-  echo "Example for 'Build a REST API with auth':"
-  echo '   {"completion_criteria":['
-  echo '     {"id":"c1","text":"API endpoints return 200 for valid requests"},'
-  echo '     {"id":"c2","text":"Authentication rejects invalid tokens"},'
-  echo '     {"id":"c3","text":"All tests pass"}]}'
-  echo ""
-  echo "OR update individual items:"
-  echo "   $CHECKLIST_SCRIPT checklist_update_text \"$LOOP_ID\" \"c1\" \"Real criterion\""
-  echo ""
-  echo "IMPORTANT: The completion promise can ONLY be output when ALL"
-  echo "criteria are marked 'completed'. Update status as you verify:"
-  echo "   $CHECKLIST_SCRIPT checklist_status \"$LOOP_ID\" \"<id>\" \"completed\""
-  echo ""
-  echo "Dashboard displays progress in real-time."
-  echo "═══════════════════════════════════════════════════════════"
 fi
 
 # Success instruction - only shown when setup succeeded
@@ -128,4 +93,46 @@ echo "when the statement is completely and unequivocally TRUE. Do not output"
 echo "false promises to escape the loop, even if you think you're stuck or"
 echo "should exit for other reasons. The loop is designed to continue until"
 echo "genuine completion."
+
+# POPULATE instructions - shown LAST for recency bias (agent more likely to notice)
+# Only show when we have a valid loop_id (state file exists)
+if [ -n "$LOOP_ID" ]; then
+  echo ""
+  echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
+  echo "!!   STOP - DO THIS FIRST: POPULATE ACCEPTANCE CRITERIA    !!"
+  echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
+  echo ""
+  echo "A placeholder checklist has been created with TODO items."
+  echo "BEFORE starting ANY work on the task, you MUST populate it with"
+  echo "real acceptance criteria - the conditions that must ALL be true"
+  echo "before you can output the completion promise."
+  echo ""
+  echo "DO NOT SKIP THIS STEP. Do it NOW before reading the task."
+  echo ""
+  echo "Steps:"
+  echo "  1. ANALYZE the task and identify what 'done' means"
+  echo "  2. DEFINE 3-6 specific, verifiable acceptance criteria"
+  echo "  3. REPLACE the placeholder checklist by running:"
+  echo ""
+  echo "     $CHECKLIST_SCRIPT checklist_init \"$LOOP_ID\" '<json>' --force"
+  echo ""
+  echo "JSON format:"
+  echo '     {"completion_criteria":[{"id":"c1","text":"..."},{"id":"c2","text":"..."}]}'
+  echo ""
+  echo "Example for 'Build a REST API with auth':"
+  echo '     {"completion_criteria":['
+  echo '       {"id":"c1","text":"API endpoints return 200 for valid requests"},'
+  echo '       {"id":"c2","text":"Authentication rejects invalid tokens"},'
+  echo '       {"id":"c3","text":"All tests pass"}]}'
+  echo ""
+  echo "OR update individual items:"
+  echo "     $CHECKLIST_SCRIPT checklist_update_text \"$LOOP_ID\" \"c1\" \"Real criterion\""
+  echo ""
+  echo "The completion promise can ONLY be output when ALL criteria are"
+  echo "marked 'completed'. Update status as you verify each one:"
+  echo "     $CHECKLIST_SCRIPT checklist_status \"$LOOP_ID\" \"<id>\" \"completed\""
+  echo ""
+  echo "Dashboard displays progress in real-time."
+  echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
+fi
 ```

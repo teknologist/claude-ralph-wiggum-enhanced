@@ -400,6 +400,34 @@ checklist_status_list() {
     " " + .id + ": " + (.text | if length > 50 then .[:50] + "..." else . end)' "$checklist_path"
 }
 
+# Check if checklist has unpopulated placeholder items
+# Returns 0 (true) if ANY criterion text starts with "TODO:"
+# Returns 1 (false) if all criteria have real text (or checklist doesn't exist)
+# Usage: checklist_has_placeholders "<loop_id>"
+checklist_has_placeholders() {
+  local loop_id="$1"
+
+  if ! validate_loop_id "$loop_id"; then
+    return 1
+  fi
+
+  local checklist_path
+  checklist_path=$(checklist_get_path "$loop_id")
+
+  if [[ ! -f "$checklist_path" ]]; then
+    return 1  # No checklist = no placeholders
+  fi
+
+  # Check if any criterion text starts with "TODO:"
+  local has_todos
+  has_todos=$(jq '[.completion_criteria[] | select(.text | startswith("TODO:"))] | length' "$checklist_path")
+
+  if [[ "$has_todos" -gt 0 ]]; then
+    return 0  # Has placeholders
+  fi
+  return 1  # No placeholders
+}
+
 # Main dispatch - allow calling functions directly
 # Usage: source ./checklist-service.sh && checklist_init ...
 # Or: ./checklist-service.sh <function> <args...
@@ -407,7 +435,7 @@ if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
   # Script is being executed directly
   if [[ $# -eq 0 ]]; then
     echo "Usage: $0 <function> <args...>" >&2
-    echo "Functions: checklist_init, checklist_status, checklist_add, checklist_get, checklist_exists, checklist_summary, checklist_status_list, checklist_update_text" >&2
+    echo "Functions: checklist_init, checklist_status, checklist_add, checklist_get, checklist_exists, checklist_summary, checklist_status_list, checklist_update_text, checklist_has_placeholders" >&2
     exit 1
   fi
 
@@ -415,7 +443,7 @@ if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
   shift
 
   case "$func" in
-    checklist_init|checklist_status|checklist_add|checklist_get|checklist_exists|checklist_summary|checklist_status_list|checklist_update_text)
+    checklist_init|checklist_status|checklist_add|checklist_get|checklist_exists|checklist_summary|checklist_status_list|checklist_update_text|checklist_has_placeholders)
       "$func" "$@"
       ;;
     *)

@@ -10,6 +10,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - **E2E tests timing out in CI**: Updated Playwright config to use production server (`bun run start`) in CI instead of dev server, reducing E2E test time from 24+ minutes to ~10 seconds
 
+## [2.3.2] - 2026-01-06
+
+### Added
+- **`checklist_has_placeholders()` function**: New function in `checklist-service.sh` to detect if checklist still contains TODO placeholder items (returns true if any criterion text starts with "TODO:")
+- **POPULATE reminder on recurring iterations**: `stop-hook.sh` now shows a prominent reminder in the systemMessage if the checklist still has placeholder items, ensuring agents are persistently reminded to populate acceptance criteria
+
+### Changed
+- **POPULATE instructions moved to end of iteration 1**: Reordered `ralph-loop.md` so POPULATE instructions appear AFTER "Please work on the task..." section, leveraging recency bias for better agent attention
+- **Enhanced POPULATE visual prominence**: Changed header from `MANDATORY:` to `!! STOP - DO THIS FIRST: !!` with exclamation point borders for stronger visual impact
+
 ## [2.3.1] - 2026-01-06
 
 ### Added
