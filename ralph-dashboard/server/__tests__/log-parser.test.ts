@@ -591,36 +591,138 @@ Content`;
     });
   });
 
-  describe('deleteSession', () => {
-    it('returns false when log file does not exist', () => {
-      const result = deleteSession('non-existent-session-id');
+  // These tests use RALPH_TEST_BASE_DIR env var to isolate from real data
+  describe('deleteSession - isolated', () => {
+    const testDir = join(tmpdir(), 'ralph-delete-session-test-' + Date.now());
+
+    beforeEach(() => {
+      mkdirSync(join(testDir, 'logs'), { recursive: true });
+      process.env.RALPH_TEST_BASE_DIR = testDir;
+      vi.resetModules();
+    });
+
+    afterEach(() => {
+      delete process.env.RALPH_TEST_BASE_DIR;
+      vi.resetModules();
+      rmSync(testDir, { recursive: true, force: true });
+    });
+
+    it('returns false when log file does not exist', async () => {
+      const { deleteSession: isolatedDeleteSession } =
+        await import('../services/log-parser');
+      const result = isolatedDeleteSession('non-existent-session-id');
       expect(result).toBe(false);
     });
   });
 
-  describe('rotateSessionLog', () => {
-    it('returns success with no changes when log file does not exist', () => {
-      // rotateSessionLog checks if LOG_FILE exists, returns early if not
-      // Since we can't easily mock the file path, this tests the basic behavior
-      const result = rotateSessionLog();
-      // Will return success since file doesn't exceed limit (or doesn't exist)
+  describe('rotateSessionLog - isolated', () => {
+    const testDir = join(tmpdir(), 'ralph-rotate-isolated-' + Date.now());
+
+    beforeEach(() => {
+      mkdirSync(join(testDir, 'logs'), { recursive: true });
+      process.env.RALPH_TEST_BASE_DIR = testDir;
+      vi.resetModules();
+    });
+
+    afterEach(() => {
+      delete process.env.RALPH_TEST_BASE_DIR;
+      vi.resetModules();
+      rmSync(testDir, { recursive: true, force: true });
+    });
+
+    it('returns success with no changes when log file does not exist', async () => {
+      const { rotateSessionLog: isolatedRotateSessionLog } =
+        await import('../services/log-parser');
+      const result = isolatedRotateSessionLog();
       expect(result.success).toBe(true);
       expect(result.sessionsPurged).toBe(0);
     });
 
-    it('returns success when under entry limit', () => {
-      // With real log file having < 100 entries, should return early
-      const result = rotateSessionLog();
+    it('returns success when under entry limit', async () => {
+      const testLogFile = join(testDir, 'logs', 'sessions.jsonl');
+
+      // Create a small log file (under 100 entries)
+      const entries = [
+        JSON.stringify({
+          loop_id: 'test-loop',
+          session_id: 'test-session',
+          status: 'active',
+          project: '/test',
+          project_name: 'test',
+          task: 'Test task',
+          started_at: new Date().toISOString(),
+          max_iterations: 10,
+        }),
+      ];
+      writeFileSync(testLogFile, entries.join('\n') + '\n');
+
+      const { rotateSessionLog: isolatedRotateSessionLog } =
+        await import('../services/log-parser');
+      const result = isolatedRotateSessionLog();
       expect(result.success).toBe(true);
       expect(result.sessionsPurged).toBe(0);
     });
   });
 
-  describe('deleteAllArchivedSessions', () => {
-    it('returns 0 when no archived sessions exist', () => {
-      // With no archived sessions, should return 0
-      const result = deleteAllArchivedSessions();
-      expect(typeof result).toBe('number');
+  describe('deleteAllArchivedSessions - isolated', () => {
+    const testDir = join(tmpdir(), 'ralph-delete-all-isolated-' + Date.now());
+
+    beforeEach(() => {
+      mkdirSync(join(testDir, 'logs'), { recursive: true });
+      process.env.RALPH_TEST_BASE_DIR = testDir;
+      vi.resetModules();
+    });
+
+    afterEach(() => {
+      delete process.env.RALPH_TEST_BASE_DIR;
+      vi.resetModules();
+      rmSync(testDir, { recursive: true, force: true });
+    });
+
+    it('returns 0 when no archived sessions exist', async () => {
+      const testLogFile = join(testDir, 'logs', 'sessions.jsonl');
+      const loopsDir = join(testDir, 'loops');
+      mkdirSync(loopsDir, { recursive: true });
+
+      // Create state file for the active session (required to be considered "active")
+      const stateFilePath = join(
+        loopsDir,
+        'ralph-loop.active-session.local.md'
+      );
+      writeFileSync(
+        stateFilePath,
+        `---
+session_id: active-session
+loop_id: active-loop
+iteration: 1
+max_iterations: 10
+completion_promise: null
+started_at: ${new Date().toISOString()}
+---
+Active task
+`
+      );
+
+      // Create a log file with only active sessions (no archived)
+      const entries = [
+        JSON.stringify({
+          loop_id: 'active-loop',
+          session_id: 'active-session',
+          status: 'active',
+          project: '/test',
+          project_name: 'test',
+          state_file_path: stateFilePath,
+          task: 'Active task',
+          started_at: new Date().toISOString(),
+          max_iterations: 10,
+        }),
+      ];
+      writeFileSync(testLogFile, entries.join('\n') + '\n');
+
+      const { deleteAllArchivedSessions: isolatedDeleteAllArchivedSessions } =
+        await import('../services/log-parser');
+      const result = isolatedDeleteAllArchivedSessions();
+      expect(result).toBe(0);
     });
   });
 
@@ -1813,63 +1915,36 @@ Long running task`;
     });
   });
 
-  describe('rotateSessionLog and deleteAllArchivedSessions - integration tests with real log file', () => {
-    const { homedir } = require('os');
-    const { join } = require('path');
-    const {
-      writeFileSync,
-      mkdirSync,
-      rmSync,
-      existsSync,
-      readFileSync,
-    } = require('fs');
-
-    const RALPH_BASE_DIR = join(homedir(), '.claude', 'ralph-wiggum-pro');
-    const LOGS_DIR = join(RALPH_BASE_DIR, 'logs');
+  describe('rotateSessionLog and deleteAllArchivedSessions - integration tests', () => {
+    // Use isolated test directory via RALPH_TEST_BASE_DIR to avoid touching real data
+    const testBaseDir = join(tmpdir(), 'ralph-integration-' + Date.now());
+    const LOGS_DIR = join(testBaseDir, 'logs');
     const LOG_FILE = join(LOGS_DIR, 'sessions.jsonl');
     const BACKUP_FILE = LOG_FILE + '.rotation-backup';
 
-    // Save original log content
-    let originalLogContent: string | null = null;
-
     beforeEach(() => {
-      // Ensure logs directory exists
+      // Create isolated test directory
       mkdirSync(LOGS_DIR, { recursive: true });
-
-      // Save original log content if file exists
-      if (existsSync(LOG_FILE)) {
-        originalLogContent = readFileSync(LOG_FILE, 'utf-8');
-      } else {
-        originalLogContent = null;
-      }
-
-      // Clean up any existing backup
-      if (existsSync(BACKUP_FILE)) {
-        rmSync(BACKUP_FILE);
-      }
+      process.env.RALPH_TEST_BASE_DIR = testBaseDir;
+      vi.resetModules();
     });
 
     afterEach(() => {
-      // Restore original log content
-      if (originalLogContent !== null) {
-        writeFileSync(LOG_FILE, originalLogContent);
-      } else if (existsSync(LOG_FILE)) {
-        rmSync(LOG_FILE);
-      }
-
-      // Clean up backup file
-      if (existsSync(BACKUP_FILE)) {
-        rmSync(BACKUP_FILE);
-      }
+      // Clean up
+      delete process.env.RALPH_TEST_BASE_DIR;
+      vi.resetModules();
+      rmSync(testBaseDir, { recursive: true, force: true });
     });
 
-    it('returns success when log file does not exist', () => {
+    it('returns success when log file does not exist', async () => {
       // Remove log file temporarily
       if (existsSync(LOG_FILE)) {
         rmSync(LOG_FILE);
       }
 
-      const result = rotateSessionLog();
+      const { rotateSessionLog: isolatedRotate } =
+        await import('../services/log-parser');
+      const result = isolatedRotate();
 
       expect(result.success).toBe(true);
       expect(result.entriesBefore).toBe(0);
@@ -1877,7 +1952,7 @@ Long running task`;
       expect(result.sessionsPurged).toBe(0);
     });
 
-    it('returns success when under entry limit', () => {
+    it('returns success when under entry limit', async () => {
       // Create log file with 50 entries (under 100 limit)
       const entries: string[] = [];
       for (let i = 0; i < 50; i++) {
@@ -1898,7 +1973,9 @@ Long running task`;
 
       writeFileSync(LOG_FILE, entries.join('\n') + '\n');
 
-      const result = rotateSessionLog();
+      const { rotateSessionLog: isolatedRotate } =
+        await import('../services/log-parser');
+      const result = isolatedRotate();
 
       expect(result.success).toBe(true);
       expect(result.sessionsPurged).toBe(0);
@@ -1906,7 +1983,7 @@ Long running task`;
       expect(result.entriesAfter).toBe(50);
     });
 
-    it('creates backup file before rotation', () => {
+    it('creates backup file before rotation', async () => {
       // Create log file with 105 complete sessions (over limit)
       const entries: string[] = [];
       for (let i = 0; i < 105; i++) {
@@ -1939,13 +2016,15 @@ Long running task`;
       writeFileSync(LOG_FILE, entries.join('\n') + '\n');
 
       // Run rotation - it should create a backup
-      const result = rotateSessionLog();
+      const { rotateSessionLog: isolatedRotate } =
+        await import('../services/log-parser');
+      const result = isolatedRotate();
 
       // Backup should be created and then removed on success
       expect(result.success).toBe(true);
     });
 
-    it('returns 0 when no archived sessions to delete', () => {
+    it('returns 0 when no archived sessions to delete', async () => {
       // Create log file with only active sessions
       const entries: string[] = [];
       for (let i = 0; i < 5; i++) {
@@ -1966,12 +2045,14 @@ Long running task`;
 
       writeFileSync(LOG_FILE, entries.join('\n') + '\n');
 
-      const result = deleteAllArchivedSessions();
+      const { deleteAllArchivedSessions: isolatedDelete } =
+        await import('../services/log-parser');
+      const result = isolatedDelete();
 
       expect(result).toBe(0);
     });
 
-    it('deletes archived sessions successfully', () => {
+    it('deletes archived sessions successfully', async () => {
       // Create log file with mixed sessions
       const entries: string[] = [
         // Active session (should NOT be deleted)
@@ -2011,12 +2092,14 @@ Long running task`;
 
       writeFileSync(LOG_FILE, entries.join('\n') + '\n');
 
-      const result = deleteAllArchivedSessions();
+      const { deleteAllArchivedSessions: isolatedDelete } =
+        await import('../services/log-parser');
+      const result = isolatedDelete();
 
       expect(result).toBeGreaterThan(0);
     });
 
-    it('preserves malformed entries during deletion', () => {
+    it('preserves malformed entries during deletion', async () => {
       // Create log file with malformed entry
       const entries: string[] = [
         // Completed session to delete
@@ -2058,7 +2141,9 @@ Long running task`;
 
       writeFileSync(LOG_FILE, entries.join('\n') + '\n');
 
-      const result = deleteAllArchivedSessions();
+      const { deleteAllArchivedSessions: isolatedDelete } =
+        await import('../services/log-parser');
+      const result = isolatedDelete();
 
       // Should delete the completed session
       expect(result).toBeGreaterThan(0);
@@ -2068,7 +2153,7 @@ Long running task`;
       expect(content).toContain('this is not valid json');
     });
 
-    it('handles missing log file gracefully during deletion', () => {
+    it('handles missing log file gracefully during deletion', async () => {
       // Create entries without log file (edge case)
       const entries: string[] = [
         JSON.stringify({
@@ -2098,13 +2183,15 @@ Long running task`;
       // Remove the log file to test the edge case
       rmSync(LOG_FILE);
 
-      const result = deleteAllArchivedSessions();
+      const { deleteAllArchivedSessions: isolatedDelete } =
+        await import('../services/log-parser');
+      const result = isolatedDelete();
 
       // Should return count even if log file doesn't exist (state files deleted)
       expect(result).toBeGreaterThanOrEqual(0);
     });
 
-    it('handles entries with only session_id (no loop_id)', () => {
+    it('handles entries with only session_id (no loop_id)', async () => {
       // Legacy entries without loop_id
       const entries: string[] = [
         // Active session (should NOT be deleted)
@@ -2141,7 +2228,9 @@ Long running task`;
 
       writeFileSync(LOG_FILE, entries.join('\n') + '\n');
 
-      const result = deleteAllArchivedSessions();
+      const { deleteAllArchivedSessions: isolatedDelete } =
+        await import('../services/log-parser');
+      const result = isolatedDelete();
 
       // Should delete the completed session
       expect(result).toBeGreaterThan(0);

@@ -16,8 +16,10 @@ import type {
 import { getChecklistWithProgress } from './checklist-service.js';
 import { findFileByLoopId } from './file-finder.js';
 
-// Global paths
-const RALPH_BASE_DIR = join(homedir(), '.claude', 'ralph-wiggum-pro');
+// Global paths - support RALPH_TEST_BASE_DIR env var for testing
+const RALPH_BASE_DIR =
+  process.env.RALPH_TEST_BASE_DIR ||
+  join(homedir(), '.claude', 'ralph-wiggum-pro');
 const LOGS_DIR = join(RALPH_BASE_DIR, 'logs');
 const LOG_FILE = join(LOGS_DIR, 'sessions.jsonl');
 
