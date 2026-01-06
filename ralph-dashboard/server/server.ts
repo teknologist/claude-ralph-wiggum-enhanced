@@ -3,7 +3,10 @@ import { existsSync, readFileSync } from 'fs';
 import type { ServerWebSocket } from 'bun';
 import { handleGetSessions, handleGetSession } from './api/sessions';
 import { handleCancelSession } from './api/cancel';
-import { handleDeleteSession } from './api/delete';
+import {
+  handleDeleteSession,
+  handleDeleteAllArchivedSessions,
+} from './api/delete';
 import { handleArchiveSession } from './api/archive';
 import {
   handleGetIterations,
@@ -176,6 +179,10 @@ export function createServer(options: ServerOptions) {
           } else {
             response = handleArchiveSession(loopId);
           }
+        }
+        // DELETE /api/sessions (delete all archived)
+        else if (path === '/api/sessions' && req.method === 'DELETE') {
+          response = handleDeleteAllArchivedSessions();
         }
         // DELETE /api/sessions/:id
         else if (

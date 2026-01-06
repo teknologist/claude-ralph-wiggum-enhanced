@@ -14,6 +14,7 @@ import type {
   Session,
 } from '../types';
 import { getChecklistWithProgress } from './checklist-service.js';
+import { findFileByLoopId } from './file-finder.js';
 
 // Global paths
 const RALPH_BASE_DIR = join(homedir(), '.claude', 'ralph-wiggum-pro');
@@ -302,9 +303,44 @@ export function getSessionById(loopId: string): Session | null {
 }
 
 /**
+ * Delete transcript files for a loop.
+ * Removes iterations.jsonl, full.jsonl, and checklist.json files.
+ * Tries both loop_id and session_id to handle different naming formats.
+ */
+function deleteTranscriptFiles(loopId: string, sessionId?: string): void {
+  const suffixes = ['iterations.jsonl', 'full.jsonl', 'checklist.json'];
+
+  // Try deleting by loop_id
+  for (const suffix of suffixes) {
+    const filePath = findFileByLoopId(loopId, suffix);
+    if (filePath && existsSync(filePath)) {
+      try {
+        unlinkSync(filePath);
+      } catch {
+        // Ignore errors - file may already be gone
+      }
+    }
+  }
+
+  // Also try deleting by session_id for older format files
+  if (sessionId && sessionId !== loopId) {
+    for (const suffix of suffixes) {
+      const filePath = findFileByLoopId(sessionId, suffix);
+      if (filePath && existsSync(filePath)) {
+        try {
+          unlinkSync(filePath);
+        } catch {
+          // Ignore errors - file may already be gone
+        }
+      }
+    }
+  }
+}
+
+/**
  * Permanently delete a loop from the log file.
  * Removes both start and completion entries for the given loop_id.
- * Also deletes the state file if it exists (to stop any active loop).
+ * Also deletes the state file and transcript files if they exist.
  * Returns true if loop was found and deleted, false otherwise.
  */
 export function deleteSession(loopId: string): boolean {
@@ -319,6 +355,10 @@ export function deleteSession(loopId: string): boolean {
       // Ignore errors - file may already be gone
     }
   }
+
+  // Delete transcript files (iterations, full transcript, checklist)
+  // Pass session_id to handle older naming formats
+  deleteTranscriptFiles(loopId, session?.session_id);
 
   if (!existsSync(LOG_FILE)) {
     return false;
@@ -366,4 +406,70 @@ export function deleteSession(loopId: string): boolean {
   renameSync(tempFile, LOG_FILE);
 
   return true;
+}
+
+/**
+ * Delete all archived sessions (not active or orphaned).
+ * Removes log entries, state files, and transcript files.
+ * Uses batch operations to avoid O(n^2) file I/O.
+ * Returns the count of deleted sessions.
+ */
+export function deleteAllArchivedSessions(): number {
+  const sessions = getSessions();
+
+  // Filter to archived only (not active or orphaned)
+  const archivedSessions = sessions.filter(
+    (s) => s.status !== 'active' && s.status !== 'orphaned'
+  );
+
+  if (archivedSessions.length === 0) {
+    return 0;
+  }
+
+  const loopIdsToDelete = new Set(archivedSessions.map((s) => s.loop_id));
+
+  // Delete state files and transcripts in one pass
+  for (const session of archivedSessions) {
+    // Delete state file if exists
+    if (session.state_file_path && existsSync(session.state_file_path)) {
+      try {
+        unlinkSync(session.state_file_path);
+      } catch {
+        // Ignore errors - file may already be gone
+      }
+    }
+    // Delete transcript files
+    deleteTranscriptFiles(session.loop_id, session.session_id);
+  }
+
+  // Single pass through log file to remove all matching entries
+  if (!existsSync(LOG_FILE)) {
+    return archivedSessions.length;
+  }
+
+  const content = readFileSync(LOG_FILE, 'utf-8');
+  const lines = content.split('\n').filter((line) => line.trim());
+
+  const filteredLines = lines.filter((line) => {
+    try {
+      const entry = JSON.parse(line) as LogEntry;
+      const entryLoopId =
+        (entry as StartLogEntry).loop_id ||
+        (entry as CompletionLogEntry).loop_id ||
+        entry.session_id;
+      return !loopIdsToDelete.has(entryLoopId);
+    } catch {
+      return true; // Keep malformed lines
+    }
+  });
+
+  // Write atomically using temp file + rename
+  const tempFile = LOG_FILE + '.tmp.' + Date.now();
+  writeFileSync(
+    tempFile,
+    filteredLines.join('\n') + (filteredLines.length > 0 ? '\n' : '')
+  );
+  renameSync(tempFile, LOG_FILE);
+
+  return archivedSessions.length;
 }

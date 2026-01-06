@@ -3,6 +3,7 @@ import type {
   SessionsResponse,
   CancelResponse,
   DeleteResponse,
+  DeleteAllResponse,
   ArchiveResponse,
   ErrorResponse,
   IterationsResponse,
@@ -43,6 +44,17 @@ export async function cancelSession(loopId: string): Promise<CancelResponse> {
 
 export async function deleteSession(loopId: string): Promise<DeleteResponse> {
   const response = await fetch(`${API_BASE}/sessions/${loopId}`, {
+    method: 'DELETE',
+  });
+  if (!response.ok) {
+    const error: ErrorResponse = await response.json();
+    throw new Error(error.message);
+  }
+  return response.json();
+}
+
+export async function deleteAllArchivedSessions(): Promise<DeleteAllResponse> {
+  const response = await fetch(`${API_BASE}/sessions`, {
     method: 'DELETE',
   });
   if (!response.ok) {

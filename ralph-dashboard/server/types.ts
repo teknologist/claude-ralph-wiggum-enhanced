@@ -87,6 +87,12 @@ export interface DeleteResponse {
   loop_id: string;
 }
 
+export interface DeleteAllResponse {
+  success: boolean;
+  deleted_count: number;
+  message: string;
+}
+
 export interface ArchiveResponse {
   success: boolean;
   message: string;

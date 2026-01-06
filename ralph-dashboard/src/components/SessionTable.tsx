@@ -2,7 +2,9 @@ import { useState, useMemo } from 'react';
 import type { Session } from '../../server/types';
 import { SessionRow } from './SessionRow';
 import { SessionCard } from './SessionCard';
+import { ConfirmModal } from './ConfirmModal';
 import { useMediaQuery } from '../hooks/useMediaQuery';
+import { useDeleteAllArchived } from '../hooks/useDeleteAllArchived';
 import { BREAKPOINTS } from '../constants/breakpoints';
 
 interface SessionTableProps {
@@ -19,9 +21,11 @@ export function SessionTable({
   setViewMode: _setViewMode, // Kept for interface consistency; used by Header, not here
 }: SessionTableProps) {
   const [activeTab, setActiveTab] = useState<Tab>('active');
+  const [showDeleteAllModal, setShowDeleteAllModal] = useState(false);
 
   // Auto-detect mobile: switch to card view on screens < 768px
   const isMobile = useMediaQuery(BREAKPOINTS.MOBILE);
+  const deleteAllMutation = useDeleteAllArchived();
 
   const { activeSessions, archivedSessions } = useMemo(() => {
     // Include both active and orphaned sessions in the "active" tab
@@ -47,6 +51,17 @@ export function SessionTable({
 
   // Determine effective view mode (mobile forces card view)
   const effectiveViewMode = isMobile ? 'card' : viewMode;
+
+  const handleDeleteAllConfirm = () => {
+    deleteAllMutation.mutate(undefined, {
+      onSuccess: () => {
+        setShowDeleteAllModal(false);
+      },
+      onError: (error) => {
+        alert(`Failed to delete: ${error.message}`);
+      },
+    });
+  };
 
   return (
     <div className="bg-white rounded-lg shadow-md overflow-hidden">
@@ -80,6 +95,21 @@ export function SessionTable({
             ({archivedSessions.length})
           </span>
         </button>
+        {/* Delete All button - shown when archived tab is active and there are archived sessions */}
+        {activeTab === 'archived' && archivedSessions.length > 0 && (
+          <button
+            onClick={() => setShowDeleteAllModal(true)}
+            disabled={deleteAllMutation.isPending}
+            className={`px-3 sm:px-4 py-3 text-sm font-medium transition-colors ${
+              deleteAllMutation.isPending
+                ? 'text-gray-400 cursor-not-allowed'
+                : 'text-red-600 hover:text-red-800 hover:bg-red-50'
+            }`}
+            title="Delete all archived loops"
+          >
+            Delete All
+          </button>
+        )}
       </div>
 
       {/* Content: Cards or Table */}
@@ -149,6 +179,18 @@ export function SessionTable({
           )}
         </div>
       )}
+
+      {/* Delete All Confirmation Modal */}
+      <ConfirmModal
+        isOpen={showDeleteAllModal}
+        title="Delete All Archived Loops?"
+        message={`This will permanently delete all ${archivedSessions.length} archived loop(s) and their transcripts. This action cannot be undone.`}
+        confirmLabel="Delete All"
+        cancelLabel="Cancel"
+        onConfirm={handleDeleteAllConfirm}
+        onCancel={() => setShowDeleteAllModal(false)}
+        isLoading={deleteAllMutation.isPending}
+      />
     </div>
   );
 }
