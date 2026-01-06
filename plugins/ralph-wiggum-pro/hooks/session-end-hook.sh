@@ -27,7 +27,8 @@ MAX_DEBUG_LOG_SIZE=1048576
 rotate_debug_log_if_needed() {
   if [[ -f "$DEBUG_LOG" ]]; then
     local size
-    size=$(stat -f%z "$DEBUG_LOG" 2>/dev/null || stat -c%s "$DEBUG_LOG" 2>/dev/null || { wc -c < "$DEBUG_LOG" 2>/dev/null; } || echo "0")
+    # Use wc -c which works on both macOS and Linux
+    size=$(wc -c < "$DEBUG_LOG" 2>/dev/null) || size="0"
     if [[ "$size" -gt "$MAX_DEBUG_LOG_SIZE" ]]; then
       # Keep last 5000 lines (approximately 500KB)
       local tmp_file
