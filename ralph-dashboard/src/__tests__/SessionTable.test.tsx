@@ -78,9 +78,9 @@ describe('SessionTable', () => {
 
   it('displays active session count badge', () => {
     const sessions: Session[] = [
-      createMockSession({ session_id: '1', status: 'active' }),
-      createMockSession({ session_id: '2', status: 'active' }),
-      createMockSession({ session_id: '3', status: 'success' }),
+      createMockSession({ loop_id: 'loop-1', status: 'active' }),
+      createMockSession({ loop_id: 'loop-2', status: 'active' }),
+      createMockSession({ loop_id: 'loop-3', status: 'success' }),
     ];
     render(
       <SessionTable
@@ -96,9 +96,9 @@ describe('SessionTable', () => {
 
   it('displays archived session count', () => {
     const sessions: Session[] = [
-      createMockSession({ session_id: '1', status: 'active' }),
-      createMockSession({ session_id: '2', status: 'success' }),
-      createMockSession({ session_id: '3', status: 'cancelled' }),
+      createMockSession({ loop_id: 'loop-1', status: 'active' }),
+      createMockSession({ loop_id: 'loop-2', status: 'success' }),
+      createMockSession({ loop_id: 'loop-3', status: 'cancelled' }),
     ];
     render(
       <SessionTable
@@ -114,7 +114,7 @@ describe('SessionTable', () => {
 
   it('shows empty state for active tab when no active sessions', () => {
     const sessions: Session[] = [
-      createMockSession({ session_id: '1', status: 'success' }),
+      createMockSession({ loop_id: 'loop-1', status: 'success' }),
     ];
     render(
       <SessionTable
@@ -131,7 +131,7 @@ describe('SessionTable', () => {
 
   it('shows empty state for archived tab when no archived sessions', () => {
     const sessions: Session[] = [
-      createMockSession({ session_id: '1', status: 'active' }),
+      createMockSession({ loop_id: 'loop-1', status: 'active' }),
     ];
     render(
       <SessionTable
@@ -151,12 +151,12 @@ describe('SessionTable', () => {
   it('switches between active and archived tabs', () => {
     const sessions: Session[] = [
       createMockSession({
-        session_id: '1',
+        loop_id: 'loop-1',
         status: 'active',
         project_name: 'active-project',
       }),
       createMockSession({
-        session_id: '2',
+        loop_id: 'loop-2',
         status: 'success',
         project_name: 'archived-project',
       }),
@@ -210,12 +210,12 @@ describe('SessionTable', () => {
 
     const sessions: Session[] = [
       createMockSession({
-        session_id: '1',
+        loop_id: 'loop-1',
         project_name: 'older-project',
         started_at: olderDate,
       }),
       createMockSession({
-        session_id: '2',
+        loop_id: 'loop-2',
         project_name: 'newer-project',
         started_at: newerDate,
       }),
@@ -236,10 +236,10 @@ describe('SessionTable', () => {
 
   it('renders all status types in archived tab', () => {
     const sessions: Session[] = [
-      createMockSession({ session_id: '1', status: 'success' }),
-      createMockSession({ session_id: '2', status: 'cancelled' }),
-      createMockSession({ session_id: '3', status: 'error' }),
-      createMockSession({ session_id: '4', status: 'max_iterations' }),
+      createMockSession({ loop_id: 'loop-1', status: 'success' }),
+      createMockSession({ loop_id: 'loop-2', status: 'cancelled' }),
+      createMockSession({ loop_id: 'loop-3', status: 'error' }),
+      createMockSession({ loop_id: 'loop-4', status: 'max_iterations' }),
     ];
     render(
       <SessionTable
@@ -272,8 +272,8 @@ describe('SessionTable', () => {
 
   it('renders card view mode correctly', () => {
     const sessions: Session[] = [
-      createMockSession({ session_id: '1', project_name: 'project-1' }),
-      createMockSession({ session_id: '2', project_name: 'project-2' }),
+      createMockSession({ loop_id: 'loop-1', project_name: 'project-1' }),
+      createMockSession({ loop_id: 'loop-2', project_name: 'project-2' }),
     ];
     render(
       <SessionTable
@@ -302,7 +302,10 @@ describe('SessionTable', () => {
 
     it('forces card view mode on mobile regardless of viewMode prop', () => {
       const sessions: Session[] = [
-        createMockSession({ session_id: '1', project_name: 'mobile-project' }),
+        createMockSession({
+          loop_id: 'loop-1',
+          project_name: 'mobile-project',
+        }),
       ];
 
       // Even though viewMode is 'table', mobile should force 'card'

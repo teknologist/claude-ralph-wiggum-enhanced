@@ -88,7 +88,7 @@ export function SessionTable({
           // Card Grid Layout (mobile or desktop card view)
           <div className="p-3 sm:p-4 grid grid-cols-1 gap-3 sm:gap-4">
             {displaySessions.map((session) => (
-              <SessionCard key={session.session_id} session={session} />
+              <SessionCard key={session.loop_id} session={session} />
             ))}
           </div>
         ) : (
@@ -119,7 +119,7 @@ export function SessionTable({
               </thead>
               <tbody className="divide-y divide-gray-200">
                 {displaySessions.map((session) => (
-                  <SessionRow key={session.session_id} session={session} />
+                  <SessionRow key={session.loop_id} session={session} />
                 ))}
               </tbody>
             </table>
