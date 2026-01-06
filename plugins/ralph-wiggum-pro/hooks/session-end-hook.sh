@@ -14,10 +14,11 @@ PLUGIN_ROOT="$(dirname "$SCRIPT_DIR")"
 RALPH_BASE_DIR="$HOME/.claude/ralph-wiggum-pro"
 LOOPS_DIR="$RALPH_BASE_DIR/loops"
 LOGS_DIR="$RALPH_BASE_DIR/logs"
+SESSIONS_DIR="$RALPH_BASE_DIR/sessions"
 DEBUG_LOG="$LOGS_DIR/debug.log"
 
 # Ensure directories exist
-mkdir -p "$LOOPS_DIR" "$LOGS_DIR"
+mkdir -p "$LOOPS_DIR" "$LOGS_DIR" "$SESSIONS_DIR"
 
 # Maximum debug log size (1MB)
 MAX_DEBUG_LOG_SIZE=1048576
@@ -92,6 +93,18 @@ if [[ -n "${CLAUDE_ENV_FILE:-}" ]] && [[ -f "$CLAUDE_ENV_FILE" ]]; then
       trap - EXIT  # Clear trap after successful operation
     fi
   fi
+fi
+
+# Clean up PPID-based session file
+# This file was created by session-start-hook to track session ID per Claude Code process
+if [[ "$PPID" =~ ^[0-9]+$ ]]; then
+  SESSION_FILE="$SESSIONS_DIR/ppid_$PPID.id"
+  if [[ -f "$SESSION_FILE" ]]; then
+    rm -f "$SESSION_FILE"
+    debug_log "Cleaned up PPID session file: $SESSION_FILE"
+  fi
+else
+  debug_log "WARNING: PPID is not numeric: $PPID - skipping session file cleanup"
 fi
 
 # Direct state file lookup

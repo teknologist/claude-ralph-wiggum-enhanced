@@ -5,13 +5,14 @@
 
 set -euo pipefail
 
-# Global paths for debug logging
+# Global paths for debug logging and session tracking
 RALPH_BASE_DIR="$HOME/.claude/ralph-wiggum-pro"
 LOGS_DIR="$RALPH_BASE_DIR/logs"
+SESSIONS_DIR="$RALPH_BASE_DIR/sessions"
 DEBUG_LOG="$LOGS_DIR/debug.log"
 
 # Ensure directories exist
-mkdir -p "$LOGS_DIR"
+mkdir -p "$LOGS_DIR" "$SESSIONS_DIR"
 
 # Maximum debug log size (1MB)
 MAX_DEBUG_LOG_SIZE=1048576
@@ -102,6 +103,23 @@ if [[ -n "${CLAUDE_ENV_FILE:-}" ]]; then
   fi
   echo "export CLAUDE_SESSION_ID=\"$SESSION_ID\"" >> "$CLAUDE_ENV_FILE"
   debug_log "Set CLAUDE_SESSION_ID=$SESSION_ID in env file"
+fi
+
+# Write session ID to PPID-based file for cross-hook/command communication
+# This allows setup-ralph-loop.sh to get the correct session ID after /clear
+# PPID identifies the Claude Code process that spawned this hook
+if [[ ! "$PPID" =~ ^[0-9]+$ ]]; then
+  debug_log "WARNING: PPID is not numeric: $PPID - skipping session file creation"
+else
+  SESSION_FILE="$SESSIONS_DIR/ppid_$PPID.id"
+  # Use atomic write (temp file + mv) to prevent partial reads
+  TEMP_SESSION_FILE=$(mktemp "${SESSION_FILE}.XXXXXX") || {
+    debug_log "WARNING: Failed to create temp file for session ID"
+    exit 0
+  }
+  echo "$SESSION_ID" > "$TEMP_SESSION_FILE"
+  mv "$TEMP_SESSION_FILE" "$SESSION_FILE"
+  debug_log "Wrote session ID to PPID file: $SESSION_FILE"
 fi
 
 exit 0

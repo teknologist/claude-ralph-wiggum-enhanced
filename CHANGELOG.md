@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.2.4] - 2026-01-06
+
+### Fixed
+- **Session ID Mismatch After `/clear` (Complete Fix)**: Replaced ineffective `CLAUDE_ENV_FILE` sourcing with PPID-based session tracking
+  - Root cause: `CLAUDE_ENV_FILE` is only available to hooks, not to slash commands/scripts
+  - Solution: Session-start-hook now writes session ID to `~/.claude/ralph-wiggum-pro/sessions/ppid_$PPID.id`
+  - `setup-ralph-loop.sh` reads from PPID file (authoritative source), falls back to env var
+  - `session-end-hook.sh` cleans up PPID file on session end
+  - PPID identifies the Claude Code process, survives `/clear`, and is unique per terminal
+
+### Security
+- **PPID Validation**: Added numeric validation for `$PPID` in all files before using in file paths (prevents path traversal)
+- **Atomic Session File Write**: Session ID file uses `mktemp` + `mv` pattern to prevent partial reads
+
 ## [2.2.3] - 2026-01-06
 
 ### Fixed

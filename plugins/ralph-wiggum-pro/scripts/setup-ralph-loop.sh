@@ -357,27 +357,32 @@ fi
 PROMPT=$(echo "$PROMPT" | sed -E 's/[[:space:]]*--force[[:space:]]*/ /g' | sed -E 's/[[:space:]]*-f[[:space:]]*/ /g')
 PROMPT=$(_cleanup_whitespace "$PROMPT")
 
-# Get session ID from environment (set by SessionStart hook via CLAUDE_ENV_FILE)
-# IMPORTANT: Source CLAUDE_ENV_FILE first to get fresh value after /clear
-# This fixes race condition where env var is stale after /clear
+# Get session ID from PPID-based file (written by session-start-hook.sh)
+# This is the authoritative source - survives /clear and doesn't rely on env vars
+# PPID identifies the Claude Code process, which is stable across /clear
 debug_log "=== SETUP-RALPH-LOOP INVOKED ==="
-debug_log "CLAUDE_ENV_FILE=${CLAUDE_ENV_FILE:-not_set}"
-debug_log "CLAUDE_SESSION_ID (before source)=${CLAUDE_SESSION_ID:-not_set}"
+debug_log "PPID=$PPID"
 
-if [[ -n "${CLAUDE_ENV_FILE:-}" ]]; then
-  if [[ -f "$CLAUDE_ENV_FILE" ]]; then
-    debug_log "Sourcing CLAUDE_ENV_FILE: $CLAUDE_ENV_FILE"
-    # shellcheck source=/dev/null
-    source "$CLAUDE_ENV_FILE"
-    debug_log "CLAUDE_SESSION_ID (after source)=${CLAUDE_SESSION_ID:-not_set}"
-  else
-    debug_log "WARNING: CLAUDE_ENV_FILE set but file does not exist: $CLAUDE_ENV_FILE"
-  fi
+SESSIONS_DIR="$RALPH_BASE_DIR/sessions"
+
+# Validate PPID is numeric before using it in file path
+if [[ ! "$PPID" =~ ^[0-9]+$ ]]; then
+  debug_log "WARNING: PPID is not numeric: $PPID - falling back to env var"
+  SESSION_ID="${CLAUDE_SESSION_ID:-}"
 else
-  debug_log "CLAUDE_ENV_FILE not set"
+  SESSION_FILE="$SESSIONS_DIR/ppid_$PPID.id"
+  debug_log "Looking for session file: $SESSION_FILE"
+
+  if [[ -f "$SESSION_FILE" ]]; then
+    SESSION_ID=$(cat "$SESSION_FILE")
+    debug_log "Read session ID from PPID file: $SESSION_ID"
+  else
+    # Fallback to env var (for backwards compatibility or if hook hasn't run yet)
+    SESSION_ID="${CLAUDE_SESSION_ID:-}"
+    debug_log "WARNING: PPID file not found, falling back to env var: $SESSION_ID"
+  fi
 fi
 
-SESSION_ID="${CLAUDE_SESSION_ID:-}"
 debug_log "Final SESSION_ID=$SESSION_ID"
 
 # FAIL LOUDLY: Session ID is required - no fallbacks
