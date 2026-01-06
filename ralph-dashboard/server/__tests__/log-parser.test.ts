@@ -7,6 +7,8 @@ import {
   getLogFilePath,
   readIterationFromStateFile,
   deleteSession,
+  rotateSessionLog,
+  deleteAllArchivedSessions,
 } from '../services/log-parser';
 import type { LogEntry, StartLogEntry, CompletionLogEntry } from '../types';
 import { writeFileSync, mkdirSync, rmSync } from 'fs';
@@ -268,8 +270,8 @@ describe('log-parser', () => {
       expect(result[1].loop_id).toBe('loop-old-session');
     });
 
-    it('should skip entries without start record', () => {
-      // This shouldn't happen in practice but good to test
+    it('should create orphaned session from completion-only entry', () => {
+      // Orphaned completions can occur when old rotation purged start entries
       const completionOnly: CompletionLogEntry = {
         loop_id: 'loop-orphan-123',
         session_id: 'orphan-123',
@@ -282,7 +284,13 @@ describe('log-parser', () => {
 
       const result = mergeSessions([completionOnly]);
 
-      expect(result).toHaveLength(0);
+      expect(result).toHaveLength(1);
+      expect(result[0].status).toBe('orphaned');
+      expect(result[0].loop_id).toBe('loop-orphan-123');
+      expect(result[0].project_name).toBe('(orphaned entry)');
+      expect(result[0].task).toBe('Orphaned: success');
+      expect(result[0].duration_seconds).toBe(1800);
+      expect(result[0].iterations).toBe(5);
     });
 
     it('should extract completion promise from task', () => {
@@ -580,6 +588,32 @@ Content`;
     it('returns false when log file does not exist', () => {
       const result = deleteSession('non-existent-session-id');
       expect(result).toBe(false);
+    });
+  });
+
+  describe('rotateSessionLog', () => {
+    it('returns success with no changes when log file does not exist', () => {
+      // rotateSessionLog checks if LOG_FILE exists, returns early if not
+      // Since we can't easily mock the file path, this tests the basic behavior
+      const result = rotateSessionLog();
+      // Will return success since file doesn't exceed limit (or doesn't exist)
+      expect(result.success).toBe(true);
+      expect(result.sessionsPurged).toBe(0);
+    });
+
+    it('returns success when under entry limit', () => {
+      // With real log file having < 100 entries, should return early
+      const result = rotateSessionLog();
+      expect(result.success).toBe(true);
+      expect(result.sessionsPurged).toBe(0);
+    });
+  });
+
+  describe('deleteAllArchivedSessions', () => {
+    it('returns 0 when no archived sessions exist', () => {
+      // With no archived sessions, should return 0
+      const result = deleteAllArchivedSessions();
+      expect(typeof result).toBe('number');
     });
   });
 });

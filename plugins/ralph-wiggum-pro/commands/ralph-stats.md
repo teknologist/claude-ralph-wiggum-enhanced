@@ -55,7 +55,7 @@ Parse the JSONL data between LOG_DATA_START and LOG_DATA_END. Each line is a JSO
 - **Completion entries** have `status: "completed"` with fields: session_id, outcome, ended_at, duration_seconds, iterations, error_reason
 
 **Merging logic:**
-1. Group all entries by `session_id`
+1. Group all entries by `loop_id` (unique per loop invocation)
 2. For each session:
    - Find the start entry (`status: "active"`) to get project, task, started_at, max_iterations, completion_promise
    - Find the completion entry (`status: "completed"`) to get outcome, ended_at, duration_seconds, iterations

@@ -7,7 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.3.3] - 2026-01-06
+
+### Added
+- **TypeScript log rotation**: New `rotateSessionLog()` function in `log-parser.ts` with 8 safety guarantees to prevent orphaned entries
+- **Orphan session visibility**: Orphaned completion entries (from old rotation bugs) now appear in Archive tab for cleanup
+- **rotate-log.ts CLI script**: Standalone rotation script callable from bash
+
 ### Fixed
+- **Log rotation creating orphans**: Old bash `tail -n 100` rotation purged start entries while keeping completions, creating invisible orphaned entries. New TypeScript rotation only purges complete sessions (both start + completion exist)
+- **`/ralph-stats` wrong session count**: Changed grouping from `session_id` to `loop_id` to correctly merge start/completion entries
+- **"Delete All" not removing orphans**: Archive filter now includes orphaned sessions so they can be deleted
+- **Plugin file path resolution**: Now uses `CLAUDE_PROJECT_DIR` / `CLAUDE_PLUGIN_ROOT` environment variables instead of fragile `../../../` relative paths
+
+### Changed
 - **E2E tests timing out in CI**: Updated Playwright config to use production server (`bun run start`) in CI instead of dev server, reducing E2E test time from 24+ minutes to ~10 seconds
 
 ## [2.3.2] - 2026-01-06

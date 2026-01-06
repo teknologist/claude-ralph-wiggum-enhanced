@@ -21,6 +21,9 @@ const RALPH_BASE_DIR = join(homedir(), '.claude', 'ralph-wiggum-pro');
 const LOGS_DIR = join(RALPH_BASE_DIR, 'logs');
 const LOG_FILE = join(LOGS_DIR, 'sessions.jsonl');
 
+// Rotation constants
+const MAX_SESSION_ENTRIES = 100;
+
 // Old path for backward compatibility (read-only, for migration)
 const OLD_LOG_FILE = join(
   homedir(),
@@ -196,8 +199,32 @@ export function mergeSessions(entries: LogEntry[]): Session[] {
   const sessions: Session[] = [];
 
   for (const [loop_id, { start, completion }] of loopMap) {
+    // Handle orphaned completions (no start entry - likely purged by old rotation)
+    if (!start && completion) {
+      sessions.push({
+        loop_id,
+        session_id: completion.session_id,
+        status: 'orphaned',
+        outcome: completion.outcome,
+        project: '',
+        project_name: '(orphaned entry)',
+        state_file_path: undefined,
+        task: `Orphaned: ${completion.outcome}`,
+        started_at: completion.ended_at, // Use end time as approximation
+        ended_at: completion.ended_at,
+        duration_seconds: completion.duration_seconds ?? 0,
+        iterations: completion.iterations ?? null,
+        max_iterations: 0,
+        completion_promise: null,
+        error_reason: completion.error_reason ?? null,
+        has_checklist: false,
+        checklist_progress: null,
+      });
+      continue;
+    }
+
     if (!start) {
-      // Skip entries without a start record (shouldn't happen)
+      // Skip if neither start nor completion (shouldn't happen)
       continue;
     }
 
@@ -407,7 +434,272 @@ export function deleteSession(loopId: string): boolean {
 }
 
 /**
- * Delete all archived sessions (not active or orphaned).
+ * Result of a rotation operation.
+ */
+export interface RotationResult {
+  success: boolean;
+  entriesBefore: number;
+  entriesAfter: number;
+  sessionsPurged: number;
+  error?: string;
+}
+
+/**
+ * Rotate session log by removing oldest COMPLETE sessions.
+ *
+ * SAFETY GUARANTEES:
+ * 1. Backup created before any modification
+ * 2. Only purges COMPLETE sessions (both start + completion exist)
+ * 3. Never removes more than 50% of entries in one rotation
+ * 4. Validates entry counts match expectations before replacing
+ * 5. Validates output file structure
+ * 6. Restores backup if ANY step fails
+ * 7. Never deletes incomplete sessions (would create orphans)
+ * 8. Uses atomic temp file + rename for final write
+ */
+export function rotateSessionLog(): RotationResult {
+  // GUARD: File must exist
+  if (!existsSync(LOG_FILE)) {
+    return {
+      success: true,
+      entriesBefore: 0,
+      entriesAfter: 0,
+      sessionsPurged: 0,
+    };
+  }
+
+  const content = readFileSync(LOG_FILE, 'utf-8');
+  const lines = content.split('\n').filter((line) => line.trim());
+  const entryCount = lines.length;
+
+  // GUARD: Only rotate if over limit
+  if (entryCount <= MAX_SESSION_ENTRIES) {
+    return {
+      success: true,
+      entriesBefore: entryCount,
+      entriesAfter: entryCount,
+      sessionsPurged: 0,
+    };
+  }
+
+  // SAFETY: Create backup before any modifications
+  const backupFile = LOG_FILE + '.rotation-backup';
+  try {
+    writeFileSync(backupFile, content);
+  } catch {
+    return {
+      success: false,
+      entriesBefore: entryCount,
+      entriesAfter: entryCount,
+      sessionsPurged: 0,
+      error: 'Failed to create backup',
+    };
+  }
+
+  try {
+    // Parse all entries
+    const entries: LogEntry[] = [];
+    for (const line of lines) {
+      try {
+        entries.push(JSON.parse(line) as LogEntry);
+      } catch {
+        // Keep malformed entries (don't delete what we can't parse)
+        continue;
+      }
+    }
+
+    // Group by loop_id
+    const byLoopId = new Map<
+      string,
+      { start?: StartLogEntry; completion?: CompletionLogEntry }
+    >();
+    for (const entry of entries) {
+      const loopId =
+        (entry as StartLogEntry).loop_id ||
+        (entry as CompletionLogEntry).loop_id ||
+        entry.session_id;
+      const existing = byLoopId.get(loopId) || {};
+
+      if (entry.status === 'active') {
+        existing.start = entry as StartLogEntry;
+      } else if (entry.status === 'completed') {
+        existing.completion = entry as CompletionLogEntry;
+      }
+      byLoopId.set(loopId, existing);
+    }
+
+    // Find COMPLETE sessions only (have BOTH start AND completion)
+    // Sort by started_at ascending (oldest first)
+    const completeSessions = Array.from(byLoopId.entries())
+      .filter(([, data]) => data.start && data.completion)
+      .map(([loopId, data]) => ({
+        loopId,
+        startedAt: data.start!.started_at,
+      }))
+      .sort((a, b) => a.startedAt.localeCompare(b.startedAt));
+
+    // GUARD: No complete sessions to purge
+    if (completeSessions.length === 0) {
+      unlinkSync(backupFile);
+      return {
+        success: true,
+        entriesBefore: entryCount,
+        entriesAfter: entryCount,
+        sessionsPurged: 0,
+      };
+    }
+
+    // Calculate how many entries to remove
+    let entriesToRemove = entryCount - MAX_SESSION_ENTRIES;
+
+    // SAFETY: Never remove more than 50% in one rotation
+    const maxRemove = Math.floor(entryCount / 2);
+    if (entriesToRemove > maxRemove) {
+      entriesToRemove = maxRemove;
+    }
+
+    // Build set of loop_ids to purge (oldest first, respecting limit)
+    const purgeIds = new Set<string>();
+    let purgeCount = 0;
+
+    for (const session of completeSessions) {
+      const loopEntries = entries.filter((e) => {
+        const id =
+          (e as StartLogEntry).loop_id ||
+          (e as CompletionLogEntry).loop_id ||
+          e.session_id;
+        return id === session.loopId;
+      });
+
+      // SAFETY: Complete session should have exactly 2 entries (start + completion)
+      if (loopEntries.length !== 2) {
+        continue; // Skip anomalies
+      }
+
+      purgeIds.add(session.loopId);
+      purgeCount += loopEntries.length;
+
+      if (purgeCount >= entriesToRemove) {
+        break;
+      }
+    }
+
+    // GUARD: Nothing to purge
+    if (purgeIds.size === 0) {
+      unlinkSync(backupFile);
+      return {
+        success: true,
+        entriesBefore: entryCount,
+        entriesAfter: entryCount,
+        sessionsPurged: 0,
+      };
+    }
+
+    // Filter out purged entries (keep original lines to preserve formatting)
+    const filteredLines: string[] = [];
+    for (const line of lines) {
+      try {
+        const entry = JSON.parse(line) as LogEntry;
+        const loopId =
+          (entry as StartLogEntry).loop_id ||
+          (entry as CompletionLogEntry).loop_id ||
+          entry.session_id;
+        if (!purgeIds.has(loopId)) {
+          filteredLines.push(line);
+        }
+      } catch {
+        // SAFETY: Keep malformed lines (don't delete what we can't parse)
+        filteredLines.push(line);
+      }
+    }
+
+    // SAFETY VALIDATION: Check counts match expectations
+    const expectedCount = entryCount - purgeCount;
+    if (filteredLines.length !== expectedCount) {
+      // Counts don't match - abort, restore backup
+      writeFileSync(LOG_FILE, content);
+      unlinkSync(backupFile);
+      return {
+        success: false,
+        entriesBefore: entryCount,
+        entriesAfter: entryCount,
+        sessionsPurged: 0,
+        error: `Count mismatch: expected ${expectedCount}, got ${filteredLines.length}`,
+      };
+    }
+
+    // SAFETY: New file must have content (we never delete everything)
+    if (filteredLines.length === 0) {
+      writeFileSync(LOG_FILE, content);
+      unlinkSync(backupFile);
+      return {
+        success: false,
+        entriesBefore: entryCount,
+        entriesAfter: entryCount,
+        sessionsPurged: 0,
+        error: 'Rotation would delete all entries',
+      };
+    }
+
+    // SAFETY: Validate each remaining line is valid JSON
+    for (const line of filteredLines) {
+      try {
+        JSON.parse(line);
+      } catch {
+        // This shouldn't happen since we kept the original lines, but check anyway
+        writeFileSync(LOG_FILE, content);
+        unlinkSync(backupFile);
+        return {
+          success: false,
+          entriesBefore: entryCount,
+          entriesAfter: entryCount,
+          sessionsPurged: 0,
+          error: 'Invalid JSON in filtered output',
+        };
+      }
+    }
+
+    // All checks passed - atomic write using temp file + rename
+    const tempFile = LOG_FILE + '.tmp.' + Date.now();
+    writeFileSync(tempFile, filteredLines.join('\n') + '\n');
+    renameSync(tempFile, LOG_FILE);
+
+    // Success - remove backup
+    unlinkSync(backupFile);
+
+    // Clean up transcripts for purged loops (non-critical)
+    for (const loopId of purgeIds) {
+      deleteTranscriptFiles(loopId);
+    }
+
+    return {
+      success: true,
+      entriesBefore: entryCount,
+      entriesAfter: filteredLines.length,
+      sessionsPurged: purgeIds.size,
+    };
+  } catch (err) {
+    // SAFETY: Any error - restore from backup
+    try {
+      const backup = readFileSync(backupFile, 'utf-8');
+      writeFileSync(LOG_FILE, backup);
+      unlinkSync(backupFile);
+    } catch {
+      // Backup restore failed - leave backup in place for manual recovery
+    }
+    return {
+      success: false,
+      entriesBefore: entryCount,
+      entriesAfter: entryCount,
+      sessionsPurged: 0,
+      error: String(err),
+    };
+  }
+}
+
+/**
+ * Delete all archived sessions (not active).
+ * Includes orphaned sessions so they can be cleaned up.
  * Removes log entries, state files, and transcript files.
  * Uses batch operations to avoid O(n^2) file I/O.
  * Returns the count of deleted sessions.
@@ -415,10 +707,8 @@ export function deleteSession(loopId: string): boolean {
 export function deleteAllArchivedSessions(): number {
   const sessions = getSessions();
 
-  // Filter to archived only (not active or orphaned)
-  const archivedSessions = sessions.filter(
-    (s) => s.status !== 'active' && s.status !== 'orphaned'
-  );
+  // Filter to archived only (includes orphaned so they can be cleaned up)
+  const archivedSessions = sessions.filter((s) => s.status !== 'active');
 
   if (archivedSessions.length === 0) {
     return 0;

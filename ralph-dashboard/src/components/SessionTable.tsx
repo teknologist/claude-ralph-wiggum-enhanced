@@ -28,13 +28,10 @@ export function SessionTable({
   const deleteAllMutation = useDeleteAllArchived();
 
   const { activeSessions, archivedSessions } = useMemo(() => {
-    // Include both active and orphaned sessions in the "active" tab
-    const active = sessions.filter(
-      (s) => s.status === 'active' || s.status === 'orphaned'
-    );
-    const archived = sessions.filter(
-      (s) => s.status !== 'active' && s.status !== 'orphaned'
-    );
+    // Only truly active sessions in the "active" tab
+    const active = sessions.filter((s) => s.status === 'active');
+    // Archive tab includes all non-active sessions (including orphaned)
+    const archived = sessions.filter((s) => s.status !== 'active');
 
     // Sort by started_at descending (most recent first)
     const sortByDate = (a: Session, b: Session) =>

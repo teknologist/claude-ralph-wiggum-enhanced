@@ -33,46 +33,31 @@ mkdir -p "$LOG_DIR" "$TRANSCRIPTS_DIR"
 MAX_SESSION_ENTRIES=100
 
 # Rotate session log if it exceeds maximum entries
-# Also cleans up associated transcript files for purged entries
+# Uses TypeScript implementation for safety (only purges complete sessions)
 rotate_session_log_if_needed() {
-  if [[ ! -f "$LOG_FILE" ]]; then
-    return 0
-  fi
+  # Use TypeScript implementation for better safety and testability
+  # It only purges COMPLETE sessions (both start + completion exist)
+  # to avoid creating orphaned entries
+  local PROJECT_ROOT ROTATE_SCRIPT
 
-  local entry_count
-  entry_count=$(wc -l < "$LOG_FILE" | tr -d ' ')
-
-  if [[ "$entry_count" -le "$MAX_SESSION_ENTRIES" ]]; then
-    return 0
-  fi
-
-  # Calculate how many entries to remove
-  local entries_to_remove=$((entry_count - MAX_SESSION_ENTRIES))
-
-  # Extract loop_ids from entries being purged (for transcript cleanup)
-  local purged_loop_ids
-  purged_loop_ids=$(head -n "$entries_to_remove" "$LOG_FILE" | jq -r '.loop_id // empty' 2>/dev/null | sort -u)
-
-  # Use mktemp for atomic temp file (prevents race conditions)
-  local tmp_file
-  tmp_file=$(mktemp "${LOG_FILE}.XXXXXX") || return 0
-
-  # Keep only the last MAX_SESSION_ENTRIES entries
-  if tail -n "$MAX_SESSION_ENTRIES" "$LOG_FILE" > "$tmp_file" 2>/dev/null; then
-    mv "$tmp_file" "$LOG_FILE"
-
-    # Clean up transcript files for purged loop_ids
-    if [[ -n "$purged_loop_ids" ]]; then
-      while IFS= read -r loop_id; do
-        [[ -z "$loop_id" ]] && continue
-        # Remove transcript files matching this loop_id (iterations and full)
-        rm -f "$TRANSCRIPTS_DIR"/*-"${loop_id}"-iterations.jsonl 2>/dev/null || true
-        rm -f "$TRANSCRIPTS_DIR"/*-"${loop_id}"-full.jsonl 2>/dev/null || true
-      done <<< "$purged_loop_ids"
-    fi
+  # Determine project root using Claude Code environment variables
+  if [[ -n "${CLAUDE_PROJECT_DIR:-}" ]]; then
+    # Running in hook context - use project directory directly
+    PROJECT_ROOT="$CLAUDE_PROJECT_DIR"
+  elif [[ -n "${CLAUDE_PLUGIN_ROOT:-}" ]]; then
+    # Running in other plugin context - navigate up from plugin root
+    PROJECT_ROOT="$(cd "$CLAUDE_PLUGIN_ROOT/../.." && pwd)"
   else
-    # Cleanup temp file on failure
-    rm -f "$tmp_file" 2>/dev/null || true
+    # Fallback: derive from script location (for direct execution/testing)
+    local SCRIPT_DIR
+    SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    PROJECT_ROOT="$(cd "$SCRIPT_DIR/../../.." && pwd)"
+  fi
+
+  ROTATE_SCRIPT="$PROJECT_ROOT/ralph-dashboard/server/scripts/rotate-log.ts"
+
+  if [[ -f "$ROTATE_SCRIPT" ]] && command -v bun &>/dev/null; then
+    bun run "$ROTATE_SCRIPT" 2>/dev/null || true
   fi
 }
 
