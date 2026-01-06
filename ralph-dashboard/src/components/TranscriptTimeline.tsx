@@ -75,10 +75,14 @@ export function TranscriptTimeline({ session }: TranscriptTimelineProps) {
   const [searchTerm, setSearchTerm] = useState('');
   const [showFullTranscript, setShowFullTranscript] = useState(false);
 
-  // Fetch iterations only when expanded
+  // Check if session is active (needs real-time updates via WebSocket)
+  const isActive = session.status === 'active' || session.status === 'orphaned';
+
+  // Fetch iterations only when expanded, with WebSocket for active sessions
   const { data, isLoading, error } = useTranscriptIterations(
     session.loop_id,
-    isExpanded
+    isExpanded,
+    isActive
   );
 
   const iterations = data?.iterations ?? [];

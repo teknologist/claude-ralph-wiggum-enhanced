@@ -143,3 +143,8 @@ export interface ChecklistResponse {
   checklist: Checklist | null;
   progress: ChecklistProgress | null;
 }
+
+// WebSocket types
+export interface WebSocketData {
+  loopId: string;
+}

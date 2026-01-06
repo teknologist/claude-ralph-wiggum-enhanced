@@ -1,5 +1,6 @@
 import { join } from 'path';
 import { existsSync, readFileSync } from 'fs';
+import type { ServerWebSocket } from 'bun';
 import { handleGetSessions, handleGetSession } from './api/sessions';
 import { handleCancelSession } from './api/cancel';
 import { handleDeleteSession } from './api/delete';
@@ -10,6 +11,12 @@ import {
   handleCheckTranscriptAvailability,
 } from './api/transcript';
 import { handleGetChecklist } from './api/checklist';
+import {
+  subscribeToLoop,
+  unsubscribeFromAll,
+  cleanupAllWatchers,
+} from './services/websocket-service';
+import type { WebSocketData } from './types';
 
 interface ServerOptions {
   port: number;
@@ -82,13 +89,26 @@ function serveStaticFile(path: string): Response | null {
 export function createServer(options: ServerOptions) {
   const { port, host } = options;
 
-  return Bun.serve({
+  const server = Bun.serve<WebSocketData>({
     port,
     hostname: host,
 
-    fetch(req) {
+    fetch(req, server) {
       const url = new URL(req.url);
       const path = url.pathname;
+
+      // Handle WebSocket upgrade requests
+      if (path === '/ws' && req.headers.get('upgrade') === 'websocket') {
+        const loopId = url.searchParams.get('loopId');
+        if (!loopId || !validateLoopId(loopId)) {
+          return new Response('Invalid loopId', { status: 400 });
+        }
+        const success = server.upgrade(req, { data: { loopId } });
+        if (success) {
+          return undefined; // Bun handles the response
+        }
+        return new Response('WebSocket upgrade failed', { status: 500 });
+      }
 
       // API routes
       if (path.startsWith('/api/')) {
@@ -261,5 +281,57 @@ export function createServer(options: ServerOptions) {
       // Fallback 404
       return new Response('Not Found', { status: 404 });
     },
+
+    // WebSocket handlers
+    websocket: {
+      open(ws: ServerWebSocket<WebSocketData>) {
+        const { loopId } = ws.data;
+        console.log(`WebSocket connected for loop: ${loopId}`);
+        const result = subscribeToLoop(loopId, ws);
+        if (!result.success) {
+          ws.send(JSON.stringify({ type: 'error', message: result.message }));
+        }
+      },
+      close(ws: ServerWebSocket<WebSocketData>) {
+        console.log(`WebSocket disconnected for loop: ${ws.data.loopId}`);
+        unsubscribeFromAll(ws);
+      },
+      message(ws: ServerWebSocket<WebSocketData>, message: string | Buffer) {
+        // Handle client messages if needed (e.g., ping/pong, subscribe to different loop)
+        try {
+          const data = JSON.parse(message.toString());
+          if (
+            data.type === 'subscribe' &&
+            data.loopId &&
+            validateLoopId(data.loopId)
+          ) {
+            // Allow subscribing to additional loops (with rate limiting)
+            const result = subscribeToLoop(data.loopId, ws);
+            if (!result.success) {
+              ws.send(
+                JSON.stringify({ type: 'error', message: result.message })
+              );
+            }
+          }
+        } catch {
+          // Ignore invalid messages
+        }
+      },
+    },
   });
+
+  // Cleanup on process exit (use once to avoid duplicate handlers on hot reload)
+  process.once('SIGINT', () => {
+    cleanupAllWatchers();
+    server.stop();
+    process.exit(0);
+  });
+
+  process.once('SIGTERM', () => {
+    cleanupAllWatchers();
+    server.stop();
+    process.exit(0);
+  });
+
+  return server;
 }
