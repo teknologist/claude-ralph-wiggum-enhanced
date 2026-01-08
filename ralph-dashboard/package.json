@@ -18,7 +18,7 @@
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
     "test:e2e:coverage": "COVERAGE=true playwright test",
-    "test:coverage:combined": "COVERAGE=true bun run test:coverage && bun run test:e2e && node scripts/merge-coverage.mjs coverage/combined/coverage-final.json coverage/coverage-final.json coverage/combined/coverage-final.json",
+    "test:coverage:combined": "COVERAGE=true bun run test:coverage && COVERAGE=true bun run test:e2e && node scripts/merge-coverage.mjs coverage/coverage-final.json coverage/coverage-final.json coverage/e2e/coverage-final.json",
     "typecheck": "tsc --noEmit",
     "lint": "eslint src server --ext .ts,.tsx",
     "dev:vite": "vite --host 0.0.0.0"

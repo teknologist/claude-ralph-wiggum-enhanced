@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from '../fixtures';
 
 /**
  * E2E tests for Transcript Timeline and Full Transcript Modal features.
