@@ -18,7 +18,7 @@ Install this plugin in Claude Code:
 
 Implementation of the Ralph Wiggum technique for iterative, self-referential AI development loops in Claude Code.
 
-> **Based on**: This is an enhanced version of the [official ralph-wiggum plugin](https://github.com/anthropics/claude-code/tree/main/plugins/ralph-wiggum) from Anthropic. See [Enhancements](#enhancements-in-this-fork) below for additions made in this version.
+> **Based on**: This is a fork of the [official ralph-wiggum plugin](https://github.com/anthropics/claude-code/tree/main/plugins/ralph-wiggum) from Anthropic. Huge thanks to Anthropic for the original plugin and to [Geoffrey Huntley](https://ghuntley.com/ralph/) for coining the Ralph Wiggum technique. See [Enhancements](#enhancements-in-this-fork) below for additions made in this fork.
 
 ## Enhancements in This Fork
 
