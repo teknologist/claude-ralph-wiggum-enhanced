@@ -21,39 +21,35 @@ A web dashboard for monitoring and managing Ralph Wiggum loops.
 
 ## Installation
 
-```bash
-# Using bun (recommended)
-bunx ralph-dashboard
+> **Note:** The dashboard will shortly be published to npm. Once available, you'll be able to run it with `bunx ralph-dashboard`.
 
-# Using npm
-npx ralph-dashboard
-```
-
-## Usage
-
-### Basic Usage
+**Running the Dashboard (for now):**
 
 ```bash
-# Start the dashboard on localhost:3847
-bunx ralph-dashboard
+# Install dependencies
+bun install
+
+# Build and start
+bun run build && bun run start
+
+# Or run in development mode
+bun run dev
 ```
 
 ### Options
 
 ```bash
 # Custom port
-bunx ralph-dashboard --port 8080
-bunx ralph-dashboard -p 8080
+bun run start -- --port 8080
 
 # Public access (bind to all interfaces)
-bunx ralph-dashboard --host 0.0.0.0
-bunx ralph-dashboard -h 0.0.0.0
+bun run start -- --host 0.0.0.0
 
 # Both options
-bunx ralph-dashboard -p 8080 -h 0.0.0.0
+bun run start -- -p 8080 -h 0.0.0.0
 
 # Show help
-bunx ralph-dashboard --help
+bun run start -- --help
 ```
 
 Once running, open your browser to the displayed URL (default: http://localhost:3847).
