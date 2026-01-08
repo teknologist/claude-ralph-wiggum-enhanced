@@ -298,28 +298,34 @@ Total: 2 sessions | ✅ 1 | ⏹ 1 | 🚫 0 | ❌ 0
 
 View and manage your Ralph loops in a web browser.
 
-**Installation:**
-```bash
-# Using bun (recommended)
-bunx ralph-dashboard
+> **Note:** The dashboard will shortly be published to npm. Once available, you'll be able to run it with `bunx ralph-dashboard`.
 
-# Using npm
-npx ralph-dashboard
+**Running the Dashboard (for now):**
+
+```bash
+# Clone the repo and navigate to the dashboard directory
+cd ralph-dashboard
+
+# Install dependencies
+bun install
+
+# Build and start
+bun run build && bun run start
+
+# Or run in development mode
+bun run dev
 ```
 
-**Usage:**
+**Options:**
 ```bash
-# Start on localhost:3847
-bunx ralph-dashboard
-
 # Custom port
-bunx ralph-dashboard --port 8080
+bun run start -- --port 8080
 
 # Public access (for remote monitoring)
-bunx ralph-dashboard --host 0.0.0.0
+bun run start -- --host 0.0.0.0
 
 # Both options
-bunx ralph-dashboard -p 8080 -h 0.0.0.0
+bun run start -- -p 8080 -h 0.0.0.0
 ```
 
 **Features:**
