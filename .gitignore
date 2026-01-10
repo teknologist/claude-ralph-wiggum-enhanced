@@ -11,3 +11,4 @@ counter.txt
 /counterglm.txt
 /ralph-dashboard/playwright-report
 /ralph-dashboard/test-results
+/logs

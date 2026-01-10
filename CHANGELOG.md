@@ -5,10 +5,10 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [2.3.9] - 2026-01-10
 
-### Added
-- **Automated npm publish**: CI workflow now publishes ralph-dashboard to npm when a GitHub Release is created (requires `NPM_TOKEN` secret)
+### Fixed
+- **Tool-only responses counted as iterations**: Fixed stop-hook.sh incrementing iteration counter and logging empty iterations when Claude responds with only tool calls (no text content). Tool-only responses now continue the loop without incrementing the counter, ensuring iteration counts reflect only meaningful work.
 
 ## [2.3.8] - 2026-01-10
 

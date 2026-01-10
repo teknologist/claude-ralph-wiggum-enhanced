@@ -418,10 +418,7 @@ if [[ "$COMPLETION_PROMISE" != "null" ]] && [[ -n "$COMPLETION_PROMISE" ]]; then
   # fi  # end iteration != 1 else block (COMMENTED OUT)
 fi
 
-# Not complete - continue loop with SAME PROMPT
-NEXT_ITERATION=$((ITERATION + 1))
-
-# Calculate elapsed time
+# Calculate elapsed time (before iteration check, so ELAPSED_STR is available)
 STARTED_AT=$(echo "$FRONTMATTER" | grep '^started_at:' | sed 's/started_at: *//' | sed 's/^"\(.*\)"$/\1/' || echo "")
 ELAPSED_STR="unknown"
 if [[ -n "$STARTED_AT" ]]; then
@@ -461,11 +458,34 @@ if [[ -z "$PROMPT_TEXT" ]]; then
   exit 0
 fi
 
-# Update iteration in frontmatter (portable across macOS and Linux)
-# Create temp file securely with mktemp, then atomically replace
-TEMP_FILE=$(mktemp "${RALPH_STATE_FILE}.tmp.XXXXXX") || exit 1
-sed "s/^iteration: .*/iteration: $NEXT_ITERATION/" "$RALPH_STATE_FILE" > "$TEMP_FILE"
-mv "$TEMP_FILE" "$RALPH_STATE_FILE"
+# Not complete - continue loop with SAME PROMPT
+# BUT only increment iteration count if there was actual text content
+# Tool-only responses (empty LAST_OUTPUT) should not count as iterations
+stripped_output=$(echo "$LAST_OUTPUT" | tr -d '[:space:]')
+if [[ -n "$stripped_output" ]]; then
+  NEXT_ITERATION=$((ITERATION + 1))
+  
+  # Update iteration in frontmatter (portable across macOS and Linux)
+  # Create temp file securely with mktemp, then atomically replace
+  TEMP_FILE=$(mktemp "${RALPH_STATE_FILE}.tmp.XXXXXX") || exit 1
+  if ! sed "s/^iteration: .*/iteration: $NEXT_ITERATION/" "$RALPH_STATE_FILE" > "$TEMP_FILE"; then
+    rm -f "$TEMP_FILE"
+    echo "Ralph loop: Failed to update iteration in state file" >&2
+    log_session "error" "Failed to update iteration in state file"
+    rm "$RALPH_STATE_FILE"
+    exit 0
+  fi
+  mv "$TEMP_FILE" "$RALPH_STATE_FILE"
+  
+  # Build system message base with NEW iteration count
+  SYSTEM_MSG_BASE="Ralph iteration $NEXT_ITERATION | Running for $ELAPSED_STR"
+else
+  # Tool-only response - continue with SAME iteration count
+  NEXT_ITERATION=$ITERATION
+  
+  # Build system message base with CURRENT iteration count (no increment)
+  SYSTEM_MSG_BASE="Ralph iteration $ITERATION | Running for $ELAPSED_STR (tool-only, continuing)"
+fi
 
 # Source checklist service for checklist operations
 CHECKLIST_SERVICE="$PLUGIN_ROOT/scripts/checklist-service.sh"
@@ -485,7 +505,7 @@ if [[ -n "$LOOP_ID" ]] && declare -f checklist_exists > /dev/null && checklist_e
   if declare -f checklist_has_placeholders > /dev/null && checklist_has_placeholders "$LOOP_ID" 2>/dev/null; then
     POPULATE_REMINDER="
 
-!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !! ACTION REQUIRED: POPULATE ACCEPTANCE CRITERIA !!
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
@@ -503,12 +523,12 @@ OR update items individually:
 
 DO NOT SKIP THIS STEP - the completion promise cannot be output
 until ALL criteria are marked completed with real criteria text.
-!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
   fi
 
   CHECKLIST_INSTRUCTION="$POPULATE_REMINDER
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 ACCEPTANCE CRITERIA ($CHECKLIST_SUMMARY)
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 $CHECKLIST_STATUS_LIST
@@ -520,15 +540,17 @@ fi
 
 # Build system message with iteration count, elapsed time, completion promise, and checklist info
 if [[ "$COMPLETION_PROMISE" != "null" ]] && [[ -n "$COMPLETION_PROMISE" ]]; then
-  SYSTEM_MSG="Ralph iteration $NEXT_ITERATION | Running for $ELAPSED_STR
+  SYSTEM_MSG="$SYSTEM_MSG_BASE
 TO COMPLETE: <promise>$COMPLETION_PROMISE</promise>
     (XML tags REQUIRED - do not output bare text)$CHECKLIST_INSTRUCTION"
 else
-  SYSTEM_MSG="Ralph iteration $NEXT_ITERATION | Running for $ELAPSED_STR | No completion promise - runs until max iterations$CHECKLIST_INSTRUCTION"
+  SYSTEM_MSG="$SYSTEM_MSG_BASE | No completion promise - runs until max iterations$CHECKLIST_INSTRUCTION"
 fi
 
-# Log this iteration's output before continuing
-[[ -n "$LOOP_ID" ]] && [[ -n "$SESSION_ID" ]] && log_iteration "$SESSION_ID" "$LOOP_ID" "$ITERATION" "$LAST_OUTPUT"
+# Log this iteration's output ONLY if there was actual text content
+if [[ -n "$LAST_OUTPUT" ]]; then
+  [[ -n "$LOOP_ID" ]] && [[ -n "$SESSION_ID" ]] && log_iteration "$SESSION_ID" "$LOOP_ID" "$ITERATION" "$LAST_OUTPUT"
+fi
 
 # Output JSON to block the stop and feed prompt back
 # The "reason" field contains the prompt that will be sent back to Claude
